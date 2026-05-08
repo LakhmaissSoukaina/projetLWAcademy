@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <h1>Modifier les rôles de {{ user.nomComplet }}</h1>
+    {{ form_start(form) }}
+        {{ form_widget(form) }}
+        <button type="submit" class="btn btn-success">Enregistrer</button>
+    {{ form_end(form) }}
+    <a href="{{ path('admin_users') }}" class="btn btn-secondary mt-3">Retour à la liste</a>
+{% endblock %}
