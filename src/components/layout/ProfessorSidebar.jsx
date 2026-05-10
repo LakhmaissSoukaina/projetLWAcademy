@@ -1,15 +1,16 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
+// src/components/layout/ProfessorSidebar.jsx
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 
 function ProfessorSidebar() {
   const location = useLocation();
-  const { logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const { logoutUser } = useAuth();
   
   const navItems = [
     { to: "/professor", icon: "dashboard", label: "Overview", exact: true },
     { to: "/professor/courses", icon: "school", label: "My Courses" },
-    { to: "/professor/students", icon: "group", label: "My Students" },      // ← AJOUTÉ
+    { to: "/professor/students", icon: "group", label: "My Students" },
     { to: "/professor/sessions", icon: "event_upcoming", label: "Tutor Sessions" },
     { to: "/professor/quiz", icon: "quiz", label: "Quiz Create" },
     { to: "/professor/ai", icon: "insights", label: "AI Reports" },
@@ -19,6 +20,15 @@ function ProfessorSidebar() {
   const isActiveRoute = (path, exact = false) => {
     if (exact) return location.pathname === path;
     return location.pathname.startsWith(path);
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login");
+  };
+
+  const handleHelpCenter = () => {
+    window.open("https://support.lwacademy.com", "_blank");
   };
 
   return (
@@ -58,12 +68,15 @@ function ProfessorSidebar() {
 
       {/* Bottom Actions */}
       <div className="mt-auto px-4 pt-6 border-t border-gray-50 mx-4 space-y-1">
-        <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 rounded-lg transition-all text-sm">
+        <button 
+          onClick={handleHelpCenter}
+          className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 rounded-lg transition-all text-sm"
+        >
           <span className="material-symbols-outlined text-lg">help</span>
           <span className="font-medium">Help Center</span>
-        </a>
+        </button>
         <button 
-          onClick={logout}
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all text-sm"
         >
           <span className="material-symbols-outlined text-lg">logout</span>

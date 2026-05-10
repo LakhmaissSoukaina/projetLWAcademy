@@ -1,7 +1,11 @@
-import { NavLink, useLocation } from "react-router-dom";
+// src/components/layout/Sidebar.jsx
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 
 function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logoutUser } = useAuth();
   
   const navItems = [
     { to: "/admin", icon: "dashboard", label: "Dashboard", exact: true },
@@ -14,6 +18,11 @@ function Sidebar() {
   const isActiveRoute = (path, exact = false) => {
     if (exact) return location.pathname === path;
     return location.pathname.startsWith(path);
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login");
   };
 
   return (
@@ -39,7 +48,6 @@ function Sidebar() {
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
               }`}
             >
-              {/* CORRECTION : Utilisation correcte de la classe avec fill conditionnel */}
               <span className={`material-symbols-outlined ${active ? 'fill-1' : ''}`}>
                 {item.icon}
               </span>
@@ -63,10 +71,13 @@ function Sidebar() {
           <span className="material-symbols-outlined text-lg">help</span>
           <span className="font-medium">Help Center</span>
         </a>
-        <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 rounded-xl transition-colors text-sm">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 rounded-xl transition-colors text-sm"
+        >
           <span className="material-symbols-outlined text-lg">logout</span>
           <span className="font-medium">Logout</span>
-        </a>
+        </button>
       </div>
     </aside>
   );

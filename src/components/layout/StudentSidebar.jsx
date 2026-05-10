@@ -1,4 +1,6 @@
-import { NavLink } from "react-router-dom";
+// src/components/layout/StudentSidebar.jsx
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 
 const navItems = [
   {
@@ -18,7 +20,7 @@ const navItems = [
   },
   {
     name: "Quiz",
-    icon: "Quiz Create",
+    icon: "quiz",
     path: "/student/quizes",
   },
   {
@@ -34,6 +36,18 @@ const navItems = [
 ];
 
 const StudentSidebar = () => {
+  const navigate = useNavigate();
+  const { logoutUser } = useAuth();
+
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login");
+  };
+
+  const handleHelpCenter = () => {
+    window.open("https://support.lwacademy.com", "_blank");
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-100 flex flex-col z-50">
       {/* Logo */}
@@ -41,7 +55,6 @@ const StudentSidebar = () => {
         <h1 className="text-2xl font-black text-blue-800">
           LW Academy
         </h1>
-
         <p className="text-xs text-gray-500 mt-1">
           Academic Excellence
         </p>
@@ -64,7 +77,6 @@ const StudentSidebar = () => {
             <span className="material-symbols-outlined">
               {item.icon}
             </span>
-
             <span>{item.name}</span>
           </NavLink>
         ))}
@@ -76,24 +88,27 @@ const StudentSidebar = () => {
           <span className="material-symbols-outlined text-sm">
             add
           </span>
-
           New Request
         </button>
 
         <div className="mt-4 space-y-2">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-500 hover:bg-gray-50 transition-all">
+          <button 
+            onClick={handleHelpCenter}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-500 hover:bg-gray-50 transition-all"
+          >
             <span className="material-symbols-outlined">
               help
             </span>
-
             Help Center
           </button>
 
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-500 hover:bg-red-50 transition-all">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-500 hover:bg-red-50 transition-all"
+          >
             <span className="material-symbols-outlined">
               logout
             </span>
-
             Logout
           </button>
         </div>

@@ -1,3 +1,4 @@
+// frontend/src/api/auth.js
 import api from "./axios";
 
 export const login = async (email, password) => {
@@ -6,7 +7,9 @@ export const login = async (email, password) => {
     password,
   });
 
-  localStorage.setItem("token", res.data.token);
+  if (res.data.token) {
+    localStorage.setItem("token", res.data.token);
+  }
 
   return res.data;
 };
@@ -17,5 +20,18 @@ export const register = async (data) => {
 
 export const getMe = async () => {
   const res = await api.get("/me");
+  return res.data;
+};
+
+// ⚠️ NOUVELLE FONCTION POUR GOOGLE LOGIN ⚠️
+export const loginWithGoogle = async (credential) => {
+  const res = await api.post("/login/google", {
+    credential: credential,
+  });
+
+  if (res.data.token) {
+    localStorage.setItem("token", res.data.token);
+  }
+
   return res.data;
 };

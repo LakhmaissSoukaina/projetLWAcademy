@@ -1,23 +1,112 @@
-import { useContext } from "react";
-import { AuthContext } from "../../context/AuthContext";
+// src/pages/admin/Dashboard.jsx
+import { useState, useEffect } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { getUsers, getAdminStats } from "../../api/adminApi";
 
-function Dashboard() {
-  const { user } = useContext(AuthContext);
+export default function Dashboard() {
+  const { user } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    pendingProfs: 0,
+    activeCourses: 0,
+    liveSessions: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [pendingProfs, setPendingProfs] = useState([]);
 
-  const users = [
-    { id: 1, name: "Marc Antoine", email: "m.antoine@edu.fr", role: "Professor", activity: "2 hours ago", status: "Active", avatar: "MA", avatarColor: "bg-blue-100 text-blue-800" },
-    { id: 2, name: "Layla Al-Farsi", email: "layla.f@academy.ae", role: "Student", activity: "14 mins ago", status: "Active", avatar: "LA", avatarColor: "bg-amber-100 text-amber-800" },
-    { id: 3, name: "Jean-Pierre Lacroix", email: "jp.lacroix@univ.be", role: "Tutor", activity: "3 days ago", status: "Inactive", avatar: "JL", avatarColor: "bg-gray-100 text-gray-600" },
-    { id: 4, name: "Sophie Dubois", email: "s.dubois@edu.fr", role: "Professor", activity: "5 mins ago", status: "Active", avatar: "SD", avatarColor: "bg-emerald-100 text-emerald-800" },
-    { id: 5, name: "Hassan Mahmoud", email: "h.mahmoud@academy.ae", role: "Professor", activity: "1 hour ago", status: "Pending", avatar: "HM", avatarColor: "bg-purple-100 text-purple-800" }
-  ];
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const pendingProfs = [
-    { id: 1, name: "Hassan Mahmoud", specialization: "Physics", time: "1h ago", initials: "HM", initialsColor: "bg-blue-800 text-white", document: "academic_resume.pdf" },
-    { id: 2, name: "Sophie Dubois", specialization: "Literature", time: "4h ago", initials: "SD", initialsColor: "bg-blue-200 text-blue-800", document: "phd_certification.pdf" },
-    { id: 3, name: "Ahmed Benali", specialization: "Mathematics", time: "6h ago", initials: "AB", initialsColor: "bg-emerald-100 text-emerald-800", document: "master_thesis.pdf" },
-    { id: 4, name: "Marie Curie", specialization: "Chemistry", time: "12h ago", initials: "MC", initialsColor: "bg-rose-100 text-rose-800", document: "research_papers.pdf" }
-  ];
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const usersData = await getUsers();
+      setUsers(usersData);
+      
+      // Calculer les stats
+      const professors = usersData.filter(u => u.roles?.includes('ROLE_PROF'));
+      const pendingProfessors = professors.filter(p => !p.isVerified);
+      
+      setStats({
+        totalUsers: usersData.length,
+        pendingProfs: pendingProfessors.length,
+        activeCourses: 1894, // À remplacer par API réelle
+        liveSessions: 86       // À remplacer par API réelle
+      });
+      
+      // Transformer les professeurs en attente pour le tableau
+      setPendingProfs(pendingProfessors.map(prof => ({
+        id: prof.id,
+        name: `${prof.prenom || ''} ${prof.nom || ''}`.trim(),
+        specialization: "À déterminer",
+        time: new Date(prof.createdAt).toLocaleDateString(),
+        initials: `${(prof.prenom?.charAt(0) || '')}${(prof.nom?.charAt(0) || '')}`,
+        initialsColor: "bg-blue-100 text-blue-800",
+        document: "pending_verification.pdf"
+      })));
+      
+    } catch (error) {
+      console.error("Error loading admin data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRoleLabel = (roles) => {
+    if (roles?.includes('ROLE_ADMIN')) return "Admin";
+    if (roles?.includes('ROLE_PROF')) return "Professor";
+    if (roles?.includes('ROLE_TUTEUR')) return "Tutor";
+    if (roles?.includes('ROLE_ETUDIANT')) return "Student";
+    return "User";
+  };
+
+  const getStatusBadge = (isVerified) => {
+    return isVerified ? "Active" : "Pending";
+  };
+
+  const getStatusColor = (isVerified) => {
+    return isVerified ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600";
+  };
+
+  const getAvatarColor = (roles) => {
+    if (roles?.includes('ROLE_ADMIN')) return "bg-blue-900 text-white";
+    if (roles?.includes('ROLE_PROF')) return "bg-blue-100 text-blue-800";
+    if (roles?.includes('ROLE_TUTEUR')) return "bg-amber-100 text-amber-800";
+    return "bg-gray-100 text-gray-600";
+  };
+
+  const getInitials = (user) => {
+    return `${(user.prenom?.charAt(0) || '')}${(user.nom?.charAt(0) || '')}`;
+  };
+
+  const getLastActivity = (user) => {
+    // Simuler une activité - à remplacer par des données réelles
+    const hours = Math.floor(Math.random() * 24);
+    if (hours === 0) return "Just now";
+    if (hours < 2) return `${hours} hour ago`;
+    return `${hours} hours ago`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+      </div>
+    );
+  }
+
+  const recentUsers = users.slice(0, 5).map(u => ({
+    id: u.id,
+    name: `${u.prenom || ''} ${u.nom || ''}`.trim(),
+    email: u.email,
+    role: getRoleLabel(u.roles),
+    activity: getLastActivity(u),
+    status: getStatusBadge(u.isVerified),
+    avatar: getInitials(u),
+    avatarColor: getAvatarColor(u.roles)
+  }));
 
   const hierarchy = [
     {
@@ -48,17 +137,7 @@ function Dashboard() {
     { id: 3, type: "Exam Verification", description: "Q3 Results Distribution Shift", icon: "task", color: "blue", action: "ANALYZE DATA" }
   ];
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      Active: "bg-emerald-50 text-emerald-600",
-      Inactive: "bg-gray-100 text-gray-500",
-      Pending: "bg-amber-50 text-amber-600"
-    };
-    return styles[status] || "bg-gray-100 text-gray-500";
-  };
-
   return (
-    /* CORRECTION : w-full max-w-full pour forcer le respect du parent */
     <div className="space-y-6 w-full max-w-full">
       
       {/* Welcome Header */}
@@ -81,7 +160,7 @@ function Dashboard() {
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+12%</span>
           </div>
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">Total Users</p>
-          <h3 className="text-2xl font-bold text-gray-900">124,582</h3>
+          <h3 className="text-2xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</h3>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-xl shadow-sm border border-gray-50 hover:shadow-md transition-all">
@@ -92,7 +171,7 @@ function Dashboard() {
             <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Urgent</span>
           </div>
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">Pending Profs</p>
-          <h3 className="text-2xl font-bold text-gray-900">42</h3>
+          <h3 className="text-2xl font-bold text-gray-900">{stats.pendingProfs}</h3>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-xl shadow-sm border border-gray-50 hover:shadow-md transition-all">
@@ -103,7 +182,7 @@ function Dashboard() {
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Active</span>
           </div>
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">Active Courses</p>
-          <h3 className="text-2xl font-bold text-gray-900">1,894</h3>
+          <h3 className="text-2xl font-bold text-gray-900">{stats.activeCourses.toLocaleString()}</h3>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-xl shadow-sm border border-gray-50 hover:shadow-md transition-all">
@@ -114,11 +193,11 @@ function Dashboard() {
             <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full animate-pulse">Live Now</span>
           </div>
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">Live Sessions</p>
-          <h3 className="text-2xl font-bold text-gray-900">86</h3>
+          <h3 className="text-2xl font-bold text-gray-900">{stats.liveSessions}</h3>
         </div>
       </section>
 
-      {/* Main Grid - Table + Validation */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         
         {/* User Management Table */}
@@ -153,7 +232,7 @@ function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {users.map((userItem) => (
+                {recentUsers.map((userItem) => (
                   <tr key={userItem.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -169,7 +248,7 @@ function Dashboard() {
                     <td className="px-5 py-4 text-sm text-gray-500">{userItem.role}</td>
                     <td className="px-5 py-4 text-sm text-gray-500">{userItem.activity}</td>
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusBadge(userItem.status)}`}>
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${userItem.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                         {userItem.status}
                       </span>
                     </td>
@@ -190,12 +269,10 @@ function Dashboard() {
           </div>
           
           <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3 bg-gray-50/30">
-            <span className="text-xs text-gray-400">Showing 5 of 124,582 users</span>
+            <span className="text-xs text-gray-400">Showing {recentUsers.length} of {stats.totalUsers} users</span>
             <div className="flex gap-1">
-              <button className="px-3 py-1 text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50" disabled>Prev</button>
+              <button className="px-3 py-1 text-xs text-gray-400 hover:text-gray-600" disabled>Prev</button>
               <button className="px-3 py-1 text-xs text-blue-900 font-bold bg-blue-50 rounded">1</button>
-              <button className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 rounded">2</button>
-              <button className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 rounded">3</button>
               <button className="px-3 py-1 text-xs text-gray-400 hover:text-gray-600">Next</button>
             </div>
           </div>
@@ -210,7 +287,7 @@ function Dashboard() {
             </span>
           </div>
           
-          <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
             {pendingProfs.map((prof) => (
               <div key={prof.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 transition-all">
                 <div className="flex justify-between items-start mb-3">
@@ -244,21 +321,26 @@ function Dashboard() {
                 </div>
               </div>
             ))}
+            {pendingProfs.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <span className="material-symbols-outlined text-4xl">check_circle</span>
+                <p className="mt-2 text-sm">No pending professors</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Second Row - Hierarchy + Stats + Notifications */}
+      {/* Second Row (reste identique avec les données) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        
-        {/* Pedagogical Hierarchy - CORRECTION STRUCTURE */}
+        {/* Pedagogical Hierarchy */}
         <div className="xl:col-span-5 bg-white rounded-xl shadow-sm border border-gray-50 p-5 lg:p-6">
           <div className="mb-5 flex justify-between items-center">
             <div>
               <h3 className="text-lg lg:text-xl font-bold text-gray-900 font-serif">Pedagogical Hierarchy</h3>
               <p className="text-xs text-gray-400 mt-1">Manage curriculum branches</p>
             </div>
-            <button className="p-2 bg-blue-50 text-blue-800 rounded-full hover:bg-blue-100 transition-colors flex-shrink-0">
+            <button className="p-2 bg-blue-50 text-blue-800 rounded-full hover:bg-blue-100 transition-colors">
               <span className="material-symbols-outlined">add</span>
             </button>
           </div>
@@ -266,27 +348,25 @@ function Dashboard() {
           <div className="space-y-4">
             {hierarchy.map((item, index) => (
               <div key={index} className="space-y-2">
-                {/* Parent Item - CORRECTION : flex-nowrap et truncate */}
                 <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-xl border border-blue-100 hover:bg-blue-50 transition-colors cursor-pointer gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="material-symbols-outlined text-blue-800 flex-shrink-0">folder_open</span>
+                    <span className="material-symbols-outlined text-blue-800">folder_open</span>
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 text-sm truncate">{item.title}</p>
                       <p className="text-xs text-gray-400">{item.subjects} Subjects | {item.modules} Modules</p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-gray-400 flex-shrink-0 cursor-pointer hover:text-blue-600">more_vert</span>
+                  <span className="material-symbols-outlined text-gray-400 cursor-pointer hover:text-blue-600">more_vert</span>
                 </div>
                 
-                {/* Sub Levels - CORRECTION : indentation et alignment */}
                 <div className="ml-4 sm:ml-6 border-l-2 border-gray-100 pl-4 space-y-2">
                   {item.subLevels.map((sub, subIndex) => (
                     <div key={subIndex} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-all gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="material-symbols-outlined text-gray-400 text-base flex-shrink-0">subdirectory_arrow_right</span>
+                        <span className="material-symbols-outlined text-gray-400 text-base">subdirectory_arrow_right</span>
                         <p className="font-medium text-gray-700 text-sm truncate">{sub.name}</p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">{sub.count}</span>
                         <span className="material-symbols-outlined text-gray-400 hover:text-blue-600 cursor-pointer text-base">edit</span>
                       </div>
@@ -298,51 +378,46 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Right Column - Stats + Broadcast */}
+        {/* Right Column */}
         <div className="xl:col-span-7 space-y-6">
-          
-          {/* Weekly Engagement - CORRECTION : SVG responsive */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-50 p-5 lg:p-6 overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/5 to-transparent" />
-            <div className="relative z-10">
-              <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-1 font-serif">Weekly Engagement</h3>
-              <p className="text-xs text-gray-400 mb-6">Real-time system resource allocation</p>
-              
-              {/* CORRECTION : SVG avec viewBox et max-width */}
-              <div className="mb-6 w-full max-w-full">
-                <svg className="w-full h-32" viewBox="0 0 400 100" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="rgba(30,64,175,0.2)" />
-                      <stop offset="100%" stopColor="rgba(30,64,175,0)" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M0,80 Q50,70 100,60 T200,40 T300,50 T400,20 L400,100 L0,100 Z" fill="url(#gradient)" />
-                  <path d="M0,80 Q50,70 100,60 T200,40 T300,50 T400,20" fill="none" stroke="#1e40af" strokeWidth="2" />
-                  <circle cx="100" cy="60" r="3" fill="#1e40af" />
-                  <circle cx="200" cy="40" r="3" fill="#1e40af" />
-                  <circle cx="300" cy="50" r="3" fill="#1e40af" />
-                  <circle cx="400" cy="20" r="3" fill="#1e40af" />
-                </svg>
-                <div className="flex justify-between text-[10px] text-gray-400 mt-2 px-1">
-                  <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          {/* Weekly Engagement */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-50 p-5 lg:p-6">
+            <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-1 font-serif">Weekly Engagement</h3>
+            <p className="text-xs text-gray-400 mb-6">Real-time system resource allocation</p>
+            
+            <div className="mb-6">
+              <svg className="w-full h-32" viewBox="0 0 400 100" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(30,64,175,0.2)" />
+                    <stop offset="100%" stopColor="rgba(30,64,175,0)" />
+                  </linearGradient>
+                </defs>
+                <path d="M0,80 Q50,70 100,60 T200,40 T300,50 T400,20 L400,100 L0,100 Z" fill="url(#gradient)" />
+                <path d="M0,80 Q50,70 100,60 T200,40 T300,50 T400,20" fill="none" stroke="#1e40af" strokeWidth="2" />
+                <circle cx="100" cy="60" r="3" fill="#1e40af" />
+                <circle cx="200" cy="40" r="3" fill="#1e40af" />
+                <circle cx="300" cy="50" r="3" fill="#1e40af" />
+                <circle cx="400" cy="20" r="3" fill="#1e40af" />
+              </svg>
+              <div className="flex justify-between text-[10px] text-gray-400 mt-2 px-1">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Server Load</p>
+                <p className="text-xl font-bold text-gray-900">24.8%</p>
+                <div className="w-full bg-gray-200 h-1.5 rounded-full mt-2">
+                  <div className="bg-blue-800 h-full w-[25%] rounded-full" />
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Server Load</p>
-                  <p className="text-xl font-bold text-gray-900">24.8%</p>
-                  <div className="w-full bg-gray-200 h-1.5 rounded-full mt-2">
-                    <div className="bg-blue-800 h-full w-[25%] rounded-full" />
-                  </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Active Streams</p>
-                  <p className="text-xl font-bold text-gray-900">142</p>
-                  <div className="w-full bg-gray-200 h-1.5 rounded-full mt-2">
-                    <div className="bg-emerald-500 h-full w-[65%] rounded-full" />
-                  </div>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Active Streams</p>
+                <p className="text-xl font-bold text-gray-900">142</p>
+                <div className="w-full bg-gray-200 h-1.5 rounded-full mt-2">
+                  <div className="bg-emerald-500 h-full w-[65%] rounded-full" />
                 </div>
               </div>
             </div>
@@ -382,7 +457,7 @@ function Dashboard() {
                 <p className="text-xs text-gray-400">Scheduled for: Immediate delivery</p>
                 <button 
                   type="button"
-                  className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex-shrink-0"
+                  className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20"
                 >
                   <span className="material-symbols-outlined text-lg">send</span>
                   Send Global Alert
@@ -431,7 +506,7 @@ function Dashboard() {
       {/* Footer Info */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
             <span className="material-symbols-outlined text-blue-800 text-sm">person</span>
           </div>
           <div className="min-w-0">
@@ -439,7 +514,7 @@ function Dashboard() {
             <p className="text-xs text-gray-400">Last login: {new Date().toLocaleString()}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-400 flex-shrink-0">
+        <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           System Operational
         </div>
@@ -447,5 +522,3 @@ function Dashboard() {
     </div>
   );
 }
-
-export default Dashboard;
