@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../../context/AuthContext";
 
 function Navbar() {
@@ -6,6 +6,9 @@ function Navbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [language, setLanguage] = useState("fr");
+
+  // État local pour la recherche
+  const [searchTerm, setSearchTerm] = useState("");
 
   const translations = {
     fr: {
@@ -41,17 +44,32 @@ function Navbar() {
   const toggleLanguage = (lang) => {
     setLanguage(lang);
     setShowLanguageMenu(false);
-    // Optionnel : sauvegarder la langue dans localStorage
     localStorage.setItem("language", lang);
   };
 
-  // Charger la langue sauvegardée au démarrage
-  useState(() => {
+  // Charger la langue sauvegardée
+  useEffect(() => {
     const savedLang = localStorage.getItem("language");
     if (savedLang && (savedLang === "fr" || savedLang === "en")) {
       setLanguage(savedLang);
     }
   }, []);
+
+  // 🔍 Gestion de la recherche + émission d'un événement personnalisé
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    // Émettre un événement que le Dashboard pourra écouter
+    window.dispatchEvent(new CustomEvent("searchTermChange", { detail: value }));
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      // Optionnel : action supplémentaire (ex: navigation)
+      console.log("Recherche soumise :", searchTerm);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 h-16 bg-white border-b border-gray-100 shadow-[0_4px_20px_rgba(30,64,175,0.05)]">
@@ -62,10 +80,13 @@ function Navbar() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-lg">
               search
             </span>
-            <input 
-              className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full w-56 lg:w-64 text-sm focus:ring-2 focus:ring-blue-200 focus:bg-white focus:border-transparent transition-all outline-none" 
-              placeholder={t.search}
+            <input
               type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full w-56 lg:w-64 text-sm focus:ring-2 focus:ring-blue-200 focus:bg-white focus:border-transparent transition-all outline-none"
+              placeholder={t.search}
             />
           </div>
           <nav className="hidden lg:flex gap-6">
@@ -76,28 +97,27 @@ function Navbar() {
           </nav>
         </div>
 
-        {/* Right Side */}
+        {/* Right Side - inchangé */}
         <div className="flex items-center gap-2">
           {/* Language Selector */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => setShowLanguageMenu(!showLanguageMenu)}
               className="text-blue-800 text-sm font-bold cursor-pointer hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors flex items-center gap-1"
             >
               {language === "fr" ? "FR" : "EN"}
               <span className="material-symbols-outlined text-sm">arrow_drop_down</span>
             </button>
-            
             {showLanguageMenu && (
               <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                <button 
+                <button
                   onClick={() => toggleLanguage("fr")}
                   className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${language === "fr" ? "text-blue-700 font-bold" : "text-gray-700"}`}
                 >
                   <span className="material-symbols-outlined text-sm">translate</span>
                   Français
                 </button>
-                <button 
+                <button
                   onClick={() => toggleLanguage("en")}
                   className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${language === "en" ? "text-blue-700 font-bold" : "text-gray-700"}`}
                 >
@@ -123,7 +143,7 @@ function Navbar() {
 
           {/* User Profile */}
           <div className="relative ml-1">
-            <button 
+            <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-gray-50 transition-all"
             >
@@ -152,7 +172,7 @@ function Navbar() {
                   {t.settings}
                 </button>
                 <div className="border-t border-gray-100 mt-1 pt-1">
-                  <button 
+                  <button
                     onClick={logout}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                   >

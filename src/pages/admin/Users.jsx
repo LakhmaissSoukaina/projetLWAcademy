@@ -1,6 +1,6 @@
 // src/pages/admin/Users.jsx
 import { useState, useEffect } from "react";
-import { getUsers, updateUserRoles } from "../../api/adminApi";
+import { getUsers, updateUserRoles, createUser } from "../../api/adminApi";
 
 export default function Users() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -9,6 +9,18 @@ export default function Users() {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // 🔍 Recherche globale (depuis la Navbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  // Écouter l'événement émis par la Navbar
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
   
   // État de la modale
   const [showModal, setShowModal] = useState(false);
@@ -30,7 +42,21 @@ export default function Users() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // === DÉFINIR LES FONCTIONS D'ABORD (avant de les utiliser) ===
+  // === DÉFINITION DES SECTIONS AVEC LEURS MOTS-CLÉS ===
+  const sections = [
+    { id: "statsOverview", title: "Cartes statistiques", keywords: ["total", "enrolled", "professors", "tutors", "students", "pending", "review", "statistiques"] },
+    { id: "filterBar", title: "Barre de filtres", keywords: ["filter", "filtre", "search", "recherche", "role", "status"] },
+    { id: "usersTable", title: "Tableau des utilisateurs", keywords: ["users", "utilisateurs", "tableau", "management", "gestion", "list"] },
+    { id: "pagination", title: "Pagination", keywords: ["pagination", "pages"] }
+  ];
+
+  const isSectionVisible = (sectionKeywords) => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return sectionKeywords.some(keyword => keyword.toLowerCase().includes(term));
+  };
+
+  // === FONCTIONS EXISTANTES ===
   const getRoleLabel = (roles) => {
     if (!roles) return "User";
     if (roles.includes('ROLE_ADMIN')) return "Admin";
@@ -49,7 +75,6 @@ export default function Users() {
     return "bg-gray-100 text-gray-600";
   };
 
-  // Charger les utilisateurs depuis l'API
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -66,7 +91,6 @@ export default function Users() {
     }
   };
 
-  // Transformer les données API pour le tableau
   const transformedUsers = users.map(user => ({
     id: user.id,
     name: `${user.prenom || ''} ${user.nom || ''}`.trim(),
@@ -84,22 +108,19 @@ export default function Users() {
     rawRoles: user.roles
   }));
 
-  // Filtrer les utilisateurs
+  // Filtrage interne (pour le tableau, indépendant de la recherche globale par section)
   const filteredUsers = transformedUsers.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
     let matchesRole = true;
     if (selectedRole !== "All Roles") {
       const roleMap = { "Students": "Student", "Professors": "Professor", "Tutors": "Tutor", "Admins": "Admin" };
       matchesRole = user.role === roleMap[selectedRole];
     }
-    
     let matchesStatus = true;
     if (selectedStatus !== "Any Status") {
       matchesStatus = user.status === selectedStatus;
     }
-    
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -117,7 +138,6 @@ export default function Users() {
     }
   };
 
-  // Gestion des rôles (édition)
   const handleEditRoles = (user) => {
     setEditingUser(user);
     alert(`Édition des rôles pour ${user.name}`);
@@ -151,7 +171,6 @@ export default function Users() {
     }
   };
 
-  // Stats
   const stats = {
     total: transformedUsers.length,
     professors: transformedUsers.filter(u => u.role === "Professor").length,
@@ -161,7 +180,6 @@ export default function Users() {
     pending: transformedUsers.filter(u => u.status === "Pending").length
   };
 
-  // Gestion du formulaire
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -182,24 +200,46 @@ export default function Users() {
     return errors;
   };
 
+  // Conversion du rôle textuel en rôle API
+  const mapRoleToApi = (role) => {
+    const roleMap = {
+      Student: "ROLE_ETUDIANT",
+      Professor: "ROLE_PROF",
+      Tutor: "ROLE_TUTEUR",
+      Admin: "ROLE_ADMIN"
+    };
+    return roleMap[role] || "ROLE_ETUDIANT";
+  };
+
+  // Modification de handleSubmit pour appeler l'API réelle
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errors = validateForm();
-    
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
-
     setIsSubmitting(true);
-    
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setShowSuccess(true);
+      // Préparer les données pour l'API
+      const apiUserData = {
+        prenom: formData.prenom.trim(),
+        nom: formData.nom.trim(),
+        email: formData.email.trim(),
+        roles: [mapRoleToApi(formData.role)],
+        isVerified: formData.status === "Active", // selon votre logique
+        specialisation: formData.specialisation,
+        telephone: formData.telephone,
+        bio: formData.bio
+      };
       
+      await createUser(apiUserData);
+      
+      setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         setShowModal(false);
+        // Réinitialiser le formulaire
         setFormData({
           prenom: "",
           nom: "",
@@ -210,10 +250,11 @@ export default function Users() {
           telephone: "",
           bio: ""
         });
-        fetchUsers();
+        fetchUsers(); // Rafraîchir la liste des utilisateurs
       }, 2000);
     } catch (error) {
       console.error("Error creating user:", error);
+      alert("Erreur lors de la création de l'utilisateur. Veuillez réessayer.");
     } finally {
       setIsSubmitting(false);
     }
@@ -233,7 +274,7 @@ export default function Users() {
 
   return (
     <div className="space-y-6 w-full max-w-full relative">
-      {/* Header */}
+      {/* Header (toujours visible, mais avec badge de filtre) */}
       <div>
         <nav className="flex items-center gap-2 mb-4 text-xs text-gray-400">
           <span className="hover:text-blue-800 cursor-pointer font-medium">Admin</span>
@@ -247,6 +288,18 @@ export default function Users() {
             <p className="text-base text-gray-500 mt-2 max-w-xl">
               Manage permissions, monitor activity, and configure accounts across the academy.
             </p>
+            {globalSearchTerm && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span className="material-symbols-outlined text-sm">search</span>
+                Showing only sections matching: <strong>{globalSearchTerm}</strong>
+                <button
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
           </div>
           <button 
             onClick={() => setShowModal(true)}
@@ -258,161 +311,166 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <section className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[280px] relative">
-          <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-            <span className="material-symbols-outlined text-lg">search</span>
-          </span>
-          <input 
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-lg focus:ring-2 focus:ring-blue-200 text-sm transition-all outline-none"
-            placeholder="Search by name, email or ID..." 
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex gap-3 flex-wrap">
-          <select 
-            className="bg-gray-50 border-none rounded-lg py-3 pl-4 pr-10 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-200 cursor-pointer outline-none"
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-          >
-            <option>All Roles</option>
-            <option>Students</option>
-            <option>Professors</option>
-            <option>Tutors</option>
-            <option>Admins</option>
-          </select>
-          
-          <select 
-            className="bg-gray-50 border-none rounded-lg py-3 pl-4 pr-10 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-200 cursor-pointer outline-none"
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-          >
-            <option>Any Status</option>
-            <option>Active</option>
-            <option>Pending</option>
-          </select>
-          
-          <button className="p-3 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg">
-            <span className="material-symbols-outlined">tune</span>
-          </button>
-        </div>
-      </section>
+      {/* Barre de filtres (masquable) */}
+      {isSectionVisible(sections.find(s => s.id === "filterBar").keywords) && (
+        <section className="bg-white p-6 rounded-xl shadow-md border border-gray-100 flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[280px] relative">
+            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+              <span className="material-symbols-outlined text-lg">search</span>
+            </span>
+            <input 
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-lg focus:ring-2 focus:ring-blue-200 text-sm transition-all outline-none"
+              placeholder="Search by name, email or ID..." 
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <select 
+              className="bg-gray-50 border-none rounded-lg py-3 pl-4 pr-10 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-200 cursor-pointer outline-none"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+            >
+              <option>All Roles</option>
+              <option>Students</option>
+              <option>Professors</option>
+              <option>Tutors</option>
+              <option>Admins</option>
+            </select>
+            <select 
+              className="bg-gray-50 border-none rounded-lg py-3 pl-4 pr-10 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-200 cursor-pointer outline-none"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+            >
+              <option>Any Status</option>
+              <option>Active</option>
+              <option>Pending</option>
+            </select>
+            <button className="p-3 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg">
+              <span className="material-symbols-outlined">tune</span>
+            </button>
+          </div>
+        </section>
+      )}
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-gray-100 shadow-md">
-          <span className="text-xs text-gray-400 uppercase tracking-widest font-bold">Total Enrolled</span>
-          <div className="text-4xl font-bold text-blue-900 mt-1 font-serif">{stats.total}</div>
+      {/* Statistiques (masquables) */}
+      {isSectionVisible(sections.find(s => s.id === "statsOverview").keywords) && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-gray-100 shadow-md">
+            <span className="text-xs text-gray-400 uppercase tracking-widest font-bold">Total Enrolled</span>
+            <div className="text-4xl font-bold text-blue-900 mt-1 font-serif">{stats.total}</div>
+          </div>
+          <div className="lg:col-span-9 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-blue-50/50 p-6 rounded-xl">
+              <div className="text-2xl font-bold text-gray-900">{stats.professors}</div>
+              <div className="text-xs text-gray-500">Professors</div>
+            </div>
+            <div className="bg-blue-50/50 p-6 rounded-xl">
+              <div className="text-2xl font-bold text-gray-900">{stats.tutors}</div>
+              <div className="text-xs text-gray-500">Tutors</div>
+            </div>
+            <div className="bg-blue-50/50 p-6 rounded-xl">
+              <div className="text-2xl font-bold text-gray-900">{stats.students}</div>
+              <div className="text-xs text-gray-500">Students</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-100">
+              <div className="text-2xl font-bold text-red-600">{stats.pending}</div>
+              <div className="text-xs text-gray-500">Pending Review</div>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="lg:col-span-9 grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-blue-50/50 p-6 rounded-xl">
-            <div className="text-2xl font-bold text-gray-900">{stats.professors}</div>
-            <div className="text-xs text-gray-500">Professors</div>
-          </div>
-          <div className="bg-blue-50/50 p-6 rounded-xl">
-            <div className="text-2xl font-bold text-gray-900">{stats.tutors}</div>
-            <div className="text-xs text-gray-500">Tutors</div>
-          </div>
-          <div className="bg-blue-50/50 p-6 rounded-xl">
-            <div className="text-2xl font-bold text-gray-900">{stats.students}</div>
-            <div className="text-xs text-gray-500">Students</div>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-100">
-            <div className="text-2xl font-bold text-red-600">{stats.pending}</div>
-            <div className="text-xs text-gray-500">Pending Review</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-500">
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox"
-                      className="rounded border-gray-300 text-blue-900 w-4 h-4 cursor-pointer"
-                      checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                    Name
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Role</th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Status</th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-500">Registered</th>
-                <th className="px-6 py-4 text-sm font-semibold text-gray-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
+      {/* Tableau des utilisateurs + pagination (masquables) */}
+      {isSectionVisible(sections.find(s => s.id === "usersTable").keywords) && (
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[900px]">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-500">
+                    <div className="flex items-center gap-3">
                       <input 
                         type="checkbox"
                         className="rounded border-gray-300 text-blue-900 w-4 h-4 cursor-pointer"
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={() => toggleSelectUser(user.id)}
+                        checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                        onChange={toggleSelectAll}
                       />
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold text-sm">
-                        {user.initials || "U"}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">{user.name}</div>
-                        <div className="text-xs text-gray-400">{user.email}</div>
-                      </div>
+                      Name
                     </div>
-                   </td>
-                  <td className="px-6 py-5">
-                    <span className={`px-3 py-1 text-[11px] font-bold rounded-full uppercase ${user.roleColor}`}>
-                      {user.role}
-                    </span>
-                   </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${user.statusDot}`}></span>
-                      <span className={`text-sm font-semibold ${user.statusColor}`}>{user.status}</span>
-                    </div>
-                   </td>
-                  <td className="px-6 py-5 text-sm text-gray-600">{user.registered}</td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {user.status === "Pending" ? (
-                        <button onClick={() => handleActivateUser(user)} className="p-2 hover:bg-green-50 rounded-lg text-green-600" title="Activate">
-                          <span className="material-symbols-outlined text-lg">check_circle</span>
-                        </button>
-                      ) : (
-                        <button onClick={() => handleSuspendUser(user)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400" title="Suspend">
-                          <span className="material-symbols-outlined text-lg">block</span>
-                        </button>
-                      )}
-                      <button onClick={() => handleEditRoles(user)} className="p-2 hover:bg-blue-50 rounded-lg text-blue-800" title="Edit Roles">
-                        <span className="material-symbols-outlined text-lg">edit_square</span>
-                      </button>
-                      <button onClick={() => handleDeleteUser(user)} className="p-2 hover:bg-red-50 rounded-lg text-red-500" title="Delete">
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </div>
-                   </td>
+                  </th>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-500">Role</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-500">Status</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-500">Registered</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-gray-500 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        <input 
+                          type="checkbox"
+                          className="rounded border-gray-300 text-blue-900 w-4 h-4 cursor-pointer"
+                          checked={selectedUsers.includes(user.id)}
+                          onChange={() => toggleSelectUser(user.id)}
+                        />
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold text-sm">
+                          {user.initials || "U"}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm">{user.name}</div>
+                          <div className="text-xs text-gray-400">{user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className={`px-3 py-1 text-[11px] font-bold rounded-full uppercase ${user.roleColor}`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${user.statusDot}`}></span>
+                        <span className={`text-sm font-semibold ${user.statusColor}`}>{user.status}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-sm text-gray-600">{user.registered}</td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {user.status === "Pending" ? (
+                          <button onClick={() => handleActivateUser(user)} className="p-2 hover:bg-green-50 rounded-lg text-green-600" title="Activate">
+                            <span className="material-symbols-outlined text-lg">check_circle</span>
+                          </button>
+                        ) : (
+                          <button onClick={() => handleSuspendUser(user)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400" title="Suspend">
+                            <span className="material-symbols-outlined text-lg">block</span>
+                          </button>
+                        )}
+                        <button onClick={() => handleEditRoles(user)} className="p-2 hover:bg-blue-50 rounded-lg text-blue-800" title="Edit Roles">
+                          <span className="material-symbols-outlined text-lg">edit_square</span>
+                        </button>
+                        <button onClick={() => handleDeleteUser(user)} className="p-2 hover:bg-red-50 rounded-lg text-red-500" title="Delete">
+                          <span className="material-symbols-outlined text-lg">delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        {/* Pagination */}
+      {/* Pagination - on la lie à la visibilité du tableau */}
+      {isSectionVisible(sections.find(s => s.id === "pagination").keywords) && 
+       isSectionVisible(sections.find(s => s.id === "usersTable").keywords) && (
         <div className="p-5 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center">
           <p className="text-xs text-gray-400">
-            Showing <span className="font-bold text-gray-900">1-{filteredUsers.length}</span> of <span className="font-bold text-gray-900">{transformedUsers.length}</span> users
+            Showing <span className="font-bold text-gray-900">{filteredUsers.length}</span> of <span className="font-bold text-gray-900">{transformedUsers.length}</span> users
           </p>
           <div className="flex gap-2">
             <button className="p-2 border rounded-lg hover:bg-white">
@@ -424,26 +482,68 @@ export default function Users() {
             </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Modal Create User */}
+      {/* Modale de création d'utilisateur */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl w-full max-w-md p-6">
             <h3 className="text-xl font-bold mb-4">Créer un utilisateur</h3>
+            {showSuccess && (
+              <div className="mb-4 p-2 bg-green-100 text-green-700 rounded text-sm">
+                Utilisateur créé avec succès !
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="text" name="prenom" placeholder="Prénom" value={formData.prenom} onChange={handleInputChange} className="w-full p-2 border rounded" />
-              <input type="text" name="nom" placeholder="Nom" value={formData.nom} onChange={handleInputChange} className="w-full p-2 border rounded" />
-              <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border rounded" />
-              <select name="role" value={formData.role} onChange={handleInputChange} className="w-full p-2 border rounded">
+              <div>
+                <input 
+                  type="text" 
+                  name="prenom" 
+                  placeholder="Prénom" 
+                  value={formData.prenom} 
+                  onChange={handleInputChange} 
+                  className={`w-full p-2 border rounded ${formErrors.prenom ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {formErrors.prenom && <p className="text-red-500 text-xs mt-1">{formErrors.prenom}</p>}
+              </div>
+              <div>
+                <input 
+                  type="text" 
+                  name="nom" 
+                  placeholder="Nom" 
+                  value={formData.nom} 
+                  onChange={handleInputChange} 
+                  className={`w-full p-2 border rounded ${formErrors.nom ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {formErrors.nom && <p className="text-red-500 text-xs mt-1">{formErrors.nom}</p>}
+              </div>
+              <div>
+                <input 
+                  type="email" 
+                  name="email" 
+                  placeholder="Email" 
+                  value={formData.email} 
+                  onChange={handleInputChange} 
+                  className={`w-full p-2 border rounded ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+              </div>
+              <select 
+                name="role" 
+                value={formData.role} 
+                onChange={handleInputChange} 
+                className="w-full p-2 border border-gray-300 rounded"
+              >
                 <option value="Student">Étudiant</option>
                 <option value="Professor">Professeur</option>
                 <option value="Tutor">Tuteur</option>
                 <option value="Admin">Administrateur</option>
               </select>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={closeModal} className="px-4 py-2 border rounded">Annuler</button>
-                <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-900 text-white rounded">Créer</button>
+                <button type="button" onClick={closeModal} className="px-4 py-2 border rounded hover:bg-gray-50">Annuler</button>
+                <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-900 text-white rounded disabled:opacity-50">
+                  {isSubmitting ? "Création..." : "Créer"}
+                </button>
               </div>
             </form>
           </div>

@@ -1,18 +1,18 @@
 // src/pages/admin/AIReports.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { 
   getProfessorAIReports, 
   generateAIReport, 
-  generateClassReport,  // ← Assure-toi que c'est importé
+  generateClassReport,
   getAISuggestions 
-} from "../../api/professorApi";import api from "../../api/axios";
+} from "../../api/professorApi";
+import api from "../../api/axios";
 
 export default function AIReports() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [studentReport, setStudentReport] = useState(null);
   const [classReport, setClassReport] = useState(null);
@@ -40,6 +40,17 @@ export default function AIReports() {
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [exporting, setExporting] = useState(false);
   const [students, setStudents] = useState([]);
+
+  // 🔍 Recherche globale
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
 
   useEffect(() => {
     fetchAIReports();
@@ -84,18 +95,18 @@ export default function AIReports() {
   };
 
   const handleGenerateClassReport = async () => {
-  setGeneratingReport(true);
-  setShowClassReportModal(true);
-  try {
-    const result = await generateClassReport(); // ← Utilise la bonne fonction
-    setClassReport(result);
-  } catch (error) {
-    console.error("Error generating class report:", error);
-    setClassReport({ report: "Erreur lors de la génération du rapport", success: false });
-  } finally {
-    setGeneratingReport(false);
-  }
-};
+    setGeneratingReport(true);
+    setShowClassReportModal(true);
+    try {
+      const result = await generateClassReport();
+      setClassReport(result);
+    } catch (error) {
+      console.error("Error generating class report:", error);
+      setClassReport({ report: "Erreur lors de la génération du rapport", success: false });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
 
   const handleGenerateStudentReport = async (studentId) => {
     setGeneratingReport(true);
@@ -140,6 +151,32 @@ export default function AIReports() {
     }
   };
 
+  // 🔍 Filtrage réactif
+  const filteredHighPerformers = useMemo(() => {
+    if (!globalSearchTerm.trim()) return highPerformers;
+    const term = globalSearchTerm.toLowerCase();
+    return highPerformers.filter(student =>
+      student.name.toLowerCase().includes(term) ||
+      student.score.toLowerCase().includes(term)
+    );
+  }, [highPerformers, globalSearchTerm]);
+
+  const filteredAtRiskStudents = useMemo(() => {
+    if (!globalSearchTerm.trim()) return atRiskStudents;
+    const term = globalSearchTerm.toLowerCase();
+    return atRiskStudents.filter(student =>
+      student.name.toLowerCase().includes(term) ||
+      student.info.toLowerCase().includes(term)
+    );
+  }, [atRiskStudents, globalSearchTerm]);
+
+  // Décider d'afficher chaque section
+  const showHighPerformersSection = filteredHighPerformers.length > 0 || !globalSearchTerm.trim();
+  const showAtRiskSection = filteredAtRiskStudents.length > 0 || !globalSearchTerm.trim();
+
+  // Aucune section à afficher ?
+  const noResults = globalSearchTerm.trim() && !showHighPerformersSection && !showAtRiskSection;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -151,8 +188,7 @@ export default function AIReports() {
   return (
     <div className="w-full bg-[#f9f9ff] min-h-screen">
       <main className="w-full px-6 lg:px-10 py-10">
-
-        {/* HEADER avec bouton Rapport Classe IA */}
+        {/* HEADER avec badge */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
           <div>
             <div className="flex items-center gap-2 text-blue-700 mb-2">
@@ -165,6 +201,18 @@ export default function AIReports() {
             <p className="text-base text-gray-500 mt-3 italic">
               Final Assessment: Introduction to Bilingual Semantics (Section B-24)
             </p>
+            {globalSearchTerm && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span className="material-symbols-outlined text-sm">search</span>
+                Global: <strong>{globalSearchTerm}</strong>
+                <button
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex gap-3">
             <button 
@@ -178,7 +226,7 @@ export default function AIReports() {
             <button 
               onClick={handleExport}
               disabled={exporting}
-              className="bg-blue-900 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md hover:bg-blue-800 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 self-start md:self-auto disabled:opacity-50"
+              className="bg-blue-900 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md hover:bg-blue-800 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 self-start disabled:opacity-50"
             >
               <span className="material-symbols-outlined">download</span>
               <span>{exporting ? "Exporting..." : "Export Reports"}</span>
@@ -186,7 +234,7 @@ export default function AIReports() {
           </div>
         </div>
 
-        {/* METRICS */}
+        {/* METRICS (toujours visibles) */}
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-8 rounded-2xl shadow-md hover:-translate-y-1 transition-all duration-300">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Average Score</p>
@@ -218,7 +266,7 @@ export default function AIReports() {
           </div>
         </section>
 
-        {/* CHART + AI */}
+        {/* HEATMAP + AI (toujours visibles) */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
           <div className="xl:col-span-2 bg-white p-8 rounded-2xl shadow-md">
             <div className="flex justify-between items-start mb-8">
@@ -231,7 +279,6 @@ export default function AIReports() {
                 Export
               </button>
             </div>
-
             <div className="h-[320px] flex items-end gap-4 border-b border-l border-gray-100 p-4 rounded-xl bg-gray-50">
               {heatmapData.map((item) => (
                 <div key={item.label} className="flex-1 flex flex-col justify-end items-center">
@@ -241,91 +288,103 @@ export default function AIReports() {
               ))}
             </div>
           </div>
-
           <div className="bg-blue-900 text-white p-8 rounded-2xl shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3 mb-6">
                 <span className="material-symbols-outlined">bolt</span>
                 <h3 className="uppercase tracking-widest text-sm font-bold">{aiInsight.title}</h3>
               </div>
-              <p className="leading-relaxed text-blue-100 mb-6">
-                {aiInsight.content}
-              </p>
+              <p className="leading-relaxed text-blue-100 mb-6">{aiInsight.content}</p>
               <img src={aiInsight.image} alt="AI" className="rounded-2xl h-44 w-full object-cover mb-6" />
             </div>
-            <button 
-              onClick={handleApplyTeachingPlan}
-              className="w-full bg-white text-blue-900 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-all duration-300"
-            >
+            <button onClick={handleApplyTeachingPlan} className="w-full bg-white text-blue-900 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-all duration-300">
               Apply Teaching Plan
             </button>
           </div>
         </div>
 
-        {/* STUDENTS avec boutons Rapport Individuel */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-            <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-green-600">workspace_premium</span>
-                <h4 className="font-bold text-gray-900">High Performers ({highPerformers.length})</h4>
-              </div>
-              <span className="text-sm text-gray-400">Score &gt; 90%</span>
-            </div>
-            <div className="p-5 space-y-5">
-              {highPerformers.map((student) => (
-                <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
-                      {student.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{student.name}</p>
-                      <p className="text-sm text-gray-500">{student.score} Correct</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => handleGenerateStudentReport(student.id)}
-                    className="text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition"
-                  >
-                    Rapport IA
-                  </button>
+        {/* Afficher les sections seulement si elles ont du contenu (ou si recherche vide) */}
+        {showHighPerformersSection && (
+          <div className="mb-8">
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-green-600">workspace_premium</span>
+                  <h4 className="font-bold text-gray-900">
+                    High Performers ({filteredHighPerformers.length})
+                  </h4>
                 </div>
-              ))}
+                <span className="text-sm text-gray-400">Score &gt; 90%</span>
+              </div>
+              <div className="p-5 space-y-5">
+                {filteredHighPerformers.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
+                        {student.initials}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{student.name}</p>
+                        <p className="text-sm text-gray-500">{student.score} Correct</p>
+                      </div>
+                    </div>
+                    <button onClick={() => handleGenerateStudentReport(student.id)} className="text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition">
+                      Rapport IA
+                    </button>
+                  </div>
+                ))}
+                {filteredHighPerformers.length === 0 && globalSearchTerm && (
+                  <p className="text-center text-gray-400 py-4">Aucun étudiant ne correspond à la recherche</p>
+                )}
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-            <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-red-600">warning</span>
-                <h4 className="font-bold text-gray-900">At-Risk Focus ({atRiskStudents.length})</h4>
-              </div>
-              <span className="text-sm text-gray-400">Score &lt; 65%</span>
-            </div>
-            <div className="p-5 space-y-5">
-              {atRiskStudents.map((student) => (
-                <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center font-bold text-red-600">
-                      {student.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{student.name}</p>
-                      <p className="text-sm text-gray-500">{student.info}</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => handleGenerateStudentReport(student.id)}
-                    className="border border-purple-500 text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition"
-                  >
-                    Rapport IA
-                  </button>
+        {showAtRiskSection && (
+          <div>
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-600">warning</span>
+                  <h4 className="font-bold text-gray-900">
+                    At-Risk Focus ({filteredAtRiskStudents.length})
+                  </h4>
                 </div>
-              ))}
+                <span className="text-sm text-gray-400">Score &lt; 65%</span>
+              </div>
+              <div className="p-5 space-y-5">
+                {filteredAtRiskStudents.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center font-bold text-red-600">
+                        {student.initials}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{student.name}</p>
+                        <p className="text-sm text-gray-500">{student.info}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => handleGenerateStudentReport(student.id)} className="border border-purple-500 text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition">
+                      Rapport IA
+                    </button>
+                  </div>
+                ))}
+                {filteredAtRiskStudents.length === 0 && globalSearchTerm && (
+                  <p className="text-center text-gray-400 py-4">Aucun étudiant ne correspond à la recherche</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Message si aucune section n'a de résultat */}
+        {noResults && (
+          <div className="text-center py-12 bg-white rounded-2xl shadow-md mt-6">
+            <span className="material-symbols-outlined text-6xl text-gray-300">search_off</span>
+            <p className="text-gray-500 mt-4">Aucun résultat pour "{globalSearchTerm}"</p>
+          </div>
+        )}
       </main>
 
       {/* MODAL RAPPORT CLASSE */}

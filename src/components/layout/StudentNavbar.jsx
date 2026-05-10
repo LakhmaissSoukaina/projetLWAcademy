@@ -1,3 +1,4 @@
+// src/components/student/StudentNavbar.js
 import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../../context/AuthContext";
 
@@ -5,6 +6,7 @@ const StudentNavbar = () => {
   const { user } = useContext(AuthContext);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [language, setLanguage] = useState("fr");
+  const [searchTerm, setSearchTerm] = useState(""); // état local
 
   // Traductions
   const translations = {
@@ -40,7 +42,20 @@ const StudentNavbar = () => {
     localStorage.setItem("student_language", lang);
   };
 
-  // Nom de l'utilisateur (valeurs par défaut si non chargé)
+  // 🔍 Gestion de la recherche + émission d'événement
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    // Émettre un événement que le Dashboard pourra écouter
+    window.dispatchEvent(new CustomEvent("searchTermChange", { detail: value }));
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      console.log("Recherche soumise :", searchTerm);
+    }
+  };
+
   const userName = user ? `${user.prenom || "Alexandre"} ${user.nom || "Dubois"}` : "Alexandre Dubois";
   const userRole = user?.roles?.includes("ROLE_ETUDIANT") ? "Étudiant" : t.premiumScholar;
 
@@ -55,11 +70,14 @@ const StudentNavbar = () => {
         <input
           type="text"
           placeholder={t.search}
+          value={searchTerm}
+          onChange={handleSearchChange}
+          onKeyDown={handleKeyDown}
           className="w-full pl-10 pr-4 py-2 rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
       </div>
 
-      {/* Right Side */}
+      {/* Right Side (inchangé) */}
       <div className="flex items-center gap-6">
         {/* Language Switch */}
         <div className="relative">
@@ -99,23 +117,14 @@ const StudentNavbar = () => {
         {/* Icons */}
         <div className="flex items-center gap-4 text-gray-500">
           <button className="relative hover:text-blue-700 transition-all">
-            <span className="material-symbols-outlined">
-              notifications
-            </span>
-
+            <span className="material-symbols-outlined">notifications</span>
             <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
           </button>
-
           <button className="hover:text-blue-700 transition-all">
-            <span className="material-symbols-outlined">
-              chat
-            </span>
+            <span className="material-symbols-outlined">chat</span>
           </button>
-
           <button className="hover:text-blue-700 transition-all">
-            <span className="material-symbols-outlined">
-              settings
-            </span>
+            <span className="material-symbols-outlined">settings</span>
           </button>
         </div>
 
@@ -125,15 +134,9 @@ const StudentNavbar = () => {
         {/* Profile */}
         <div className="flex items-center gap-3">
           <div className="hidden lg:block text-right">
-            <p className="text-sm font-bold text-gray-800">
-              {userName}
-            </p>
-
-            <p className="text-xs text-gray-500">
-              {userRole}
-            </p>
+            <p className="text-sm font-bold text-gray-800">{userName}</p>
+            <p className="text-xs text-gray-500">{userRole}</p>
           </div>
-
           <img
             src={user?.photo || "https://i.pravatar.cc/150?img=12"}
             alt="student"

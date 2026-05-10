@@ -13,6 +13,17 @@ export default function ProfessorDashboard() {
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [accessCodes, setAccessCodes] = useState([]);
 
+  // Recherche globale
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
@@ -29,6 +40,7 @@ export default function ProfessorDashboard() {
       setAccessCodes(coursesData.flatMap(c => c.accessCodes || []));
     } catch (error) {
       console.error("Error loading dashboard:", error);
+      // Données mockées (inchangées)
       setStats({ totalStudents: 1284, publishedCourses: 24, liveSessions: 8, successRate: 94.2 });
       setCourses([
         {
@@ -67,6 +79,118 @@ export default function ProfessorDashboard() {
     }
   };
 
+  // Filtrage en fonction du terme global
+  const filteredCourses = courses.filter(course => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return (
+      course.title.toLowerCase().includes(term) ||
+      course.level.toLowerCase().includes(term) ||
+      course.department.toLowerCase().includes(term) ||
+      (course.chapters && course.chapters.some(ch => ch.name.toLowerCase().includes(term))) ||
+      course.icon?.toLowerCase().includes(term)
+    );
+  });
+
+  const filteredAccessCodes = accessCodes.filter(code => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return (
+      code.course.toLowerCase().includes(term) ||
+      code.code.toLowerCase().includes(term) ||
+      code.status.toLowerCase().includes(term)
+    );
+  });
+
+  // Fonction pour savoir si une section doit être affichée
+  const isSectionVisible = () => {
+    if (!globalSearchTerm.trim()) return true;
+    // Pour chaque section, on vérifie si son contenu (filtré) n'est pas vide
+    // Ou si les KPI contiennent le terme (on va tester rapidement sur les labels/valeurs)
+    const term = globalSearchTerm.toLowerCase();
+    
+    // Section KPI : valeurs totalStudents, publishedCourses, liveSessions, successRate
+    const kpiMatches = [
+      "Total Students", stats.totalStudents.toString(),
+      "Published Courses", stats.publishedCourses.toString(),
+      "Live Sessions", stats.liveSessions.toString(),
+      "Success Rate", `${stats.successRate}%`
+    ].some(text => text.toLowerCase().includes(term));
+    
+    // Section Course Portfolio : filteredCourses non vide
+    const courseMatches = filteredCourses.length > 0;
+    
+    // Section Access Codes : filteredAccessCodes non vide
+    const codeMatches = filteredAccessCodes.length > 0;
+    
+    // Section AI Insights : au moins un insight contient le terme
+    const aiMatches = aiInsights.some(insight => 
+      insight.title.toLowerCase().includes(term) || insight.content.toLowerCase().includes(term)
+    );
+    
+    // Section Student Tutors : nom, score, rank, initials
+    const tutorMatches = studentTutors.some(tutor =>
+      tutor.name.toLowerCase().includes(term) ||
+      tutor.score.toLowerCase().includes(term) ||
+      tutor.rank.toString().includes(term) ||
+      tutor.initials.toLowerCase().includes(term)
+    );
+    
+    // Section Upcoming Sessions : day, time, title
+    const sessionMatches = upcomingSessions.some(session =>
+      session.day.toLowerCase().includes(term) ||
+      session.time.toLowerCase().includes(term) ||
+      session.title.toLowerCase().includes(term)
+    );
+    
+    // On retourne true si au moins une section a du contenu correspondant
+    return kpiMatches || courseMatches || codeMatches || aiMatches || tutorMatches || sessionMatches;
+  };
+
+  // Masquage individuel des sections (pour éviter d'afficher une section vide)
+  const showKpi = () => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return [
+      "Total Students", stats.totalStudents.toString(),
+      "Published Courses", stats.publishedCourses.toString(),
+      "Live Sessions", stats.liveSessions.toString(),
+      "Success Rate", `${stats.successRate}%`
+    ].some(text => text.toLowerCase().includes(term));
+  };
+
+  const showCoursePortfolio = () => filteredCourses.length > 0 || !globalSearchTerm.trim();
+  const showAccessCodes = () => filteredAccessCodes.length > 0 || !globalSearchTerm.trim();
+  
+  const showAiInsights = () => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return aiInsights.some(insight => 
+      insight.title.toLowerCase().includes(term) || insight.content.toLowerCase().includes(term)
+    );
+  };
+  
+  const showStudentTutors = () => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return studentTutors.some(tutor =>
+      tutor.name.toLowerCase().includes(term) ||
+      tutor.score.toLowerCase().includes(term) ||
+      tutor.rank.toString().includes(term) ||
+      tutor.initials.toLowerCase().includes(term)
+    );
+  };
+  
+  const showUpcomingSessions = () => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return upcomingSessions.some(session =>
+      session.day.toLowerCase().includes(term) ||
+      session.time.toLowerCase().includes(term) ||
+      session.title.toLowerCase().includes(term)
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -76,198 +200,246 @@ export default function ProfessorDashboard() {
   }
 
   return (
-    // Pas de ml-* — ProfessorLayout gère déjà ml-64
-    // pt-5 px-6 pb-10 cohérent avec les autres pages du projet
     <div className="pt-6 px-8 pb-12 bg-[#f9f9ff] min-h-screen">
-
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-4xl font-bold text-blue-900 font-serif">Professor Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Welcome back, {user?.prenom || "Dr."} {user?.nom || "Professor"}
-        </p>
+        <div className="flex justify-between items-start flex-wrap gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-blue-900 font-serif">Professor Dashboard</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Welcome back, {user?.prenom || "Dr."} {user?.nom || "Professor"}
+            </p>
+          </div>
+          {globalSearchTerm && (
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+              <span className="material-symbols-outlined text-sm">search</span>
+              Showing results for: <strong>{globalSearchTerm}</strong>
+              <button
+                onClick={() => setGlobalSearchTerm("")}
+                className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Afficher un message si aucun résultat */}
+      {globalSearchTerm && !isSectionVisible() && (
+        <div className="text-center py-12">
+          <span className="material-symbols-outlined text-6xl text-gray-300">search_off</span>
+          <p className="text-gray-500 mt-4">No content matches your search.</p>
+          <button
+            onClick={() => setGlobalSearchTerm("")}
+            className="mt-4 text-blue-700 font-semibold hover:underline"
+          >
+            Clear search
+          </button>
+        </div>
+      )}
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        {[
-          {
-            label: "Total Students", value: stats.totalStudents.toLocaleString(),
-            badge: <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">trending_up</span>+12%
-            </span>
-          },
-          {
-            label: "Published Courses", value: stats.publishedCourses,
-            badge: <span className="material-symbols-outlined text-gray-400 text-sm">library_books</span>
-          },
-          {
-            label: "Live Sessions", value: stats.liveSessions,
-            badge: <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">This Week</span>
-          },
-          {
-            label: "Success Rate", value: `${stats.successRate}%`,
-            badge: (
-              <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="bg-blue-900 h-full rounded-full" style={{ width: `${stats.successRate}%` }} />
-              </div>
-            )
-          },
-        ].map(({ label, value, badge }) => (
-          <div key={label} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{label}</span>
-              {badge}
-            </div>
-            <span className="text-3xl font-bold text-blue-900">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Left — 2 cols */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* Course Portfolio */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-base font-bold text-blue-900">Course Portfolio</h2>
-              <button className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-blue-800 transition">
-                <span className="material-symbols-outlined text-sm">add</span> New Course
-              </button>
-            </div>
-            <div className="space-y-3">
-              {courses.map((course) => (
-                <div key={course.id} className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 transition bg-gray-50/30">
-                  <div className="flex items-start justify-between">
-                    <div className="flex gap-3">
-                      <div className="h-11 w-11 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="material-symbols-outlined text-blue-900 text-xl">{course.icon}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
-                          <span>{course.level}</span> • <span>{course.department}</span>
-                        </div>
-                        <h3 className="font-bold text-blue-900 text-sm">{course.title}</h3>
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button className="text-blue-900 hover:bg-blue-50 p-1 rounded-full transition">
-                        <span className="material-symbols-outlined text-sm">library_add</span>
-                      </button>
-                      <button className="text-blue-900 hover:bg-blue-50 p-1 rounded-full transition">
-                        <span className="material-symbols-outlined text-sm">vpn_key</span>
-                      </button>
-                    </div>
-                  </div>
-                  {course.chapters?.length > 0 && (
-                    <div className="ml-14 mt-2 space-y-1 border-l-2 border-gray-100 pl-3">
-                      {course.chapters.map((chapter, idx) => (
-                        <div key={idx} className="flex justify-between items-center py-0.5 text-xs">
-                          <span className="text-gray-600">{chapter.name}</span>
-                          <span className="text-gray-400 ml-2 whitespace-nowrap">{chapter.modules} Modules</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+      {showKpi() && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+          {[
+            {
+              label: "Total Students", value: stats.totalStudents.toLocaleString(),
+              badge: <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">trending_up</span>+12%
+              </span>
+            },
+            {
+              label: "Published Courses", value: stats.publishedCourses,
+              badge: <span className="material-symbols-outlined text-gray-400 text-sm">library_books</span>
+            },
+            {
+              label: "Live Sessions", value: stats.liveSessions,
+              badge: <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">This Week</span>
+            },
+            {
+              label: "Success Rate", value: `${stats.successRate}%`,
+              badge: (
+                <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="bg-blue-900 h-full rounded-full" style={{ width: `${stats.successRate}%` }} />
                 </div>
-              ))}
+              )
+            },
+          ].map(({ label, value, badge }) => (
+            <div key={label} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{label}</span>
+                {badge}
+              </div>
+              <span className="text-3xl font-bold text-blue-900">{value}</span>
             </div>
-          </div>
+          ))}
+        </div>
+      )}
 
-          {/* Access Code Management — JSX corrigé */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-bold text-blue-900 mb-4">Access Code Management</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-gray-100">
-                  <tr className="text-xs text-gray-400">
-                    <th className="pb-2 text-left font-semibold">Course</th>
-                    <th className="pb-2 text-left font-semibold">Code</th>
-                    <th className="pb-2 text-left font-semibold">Uses</th>
-                    <th className="pb-2 text-left font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accessCodes.map((code) => (
-                    <tr key={code.id} className="border-b border-gray-50">
-                      <td className="py-2 text-gray-700 text-xs">{code.course}</td>
-                      <td className="py-2 font-mono text-blue-800 font-bold text-xs">{code.code}</td>
-                      <td className="py-2 text-gray-500 text-xs">{code.uses}</td>
-                      <td className="py-2">
-                        <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">
-                          {code.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Course Portfolio */}
+          {showCoursePortfolio() && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-base font-bold text-blue-900">Course Portfolio</h2>
+                <button className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-blue-800 transition">
+                  <span className="material-symbols-outlined text-sm">add</span> New Course
+                </button>
+              </div>
+              <div className="space-y-3">
+                {filteredCourses.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <span className="material-symbols-outlined text-4xl">search_off</span>
+                    <p className="mt-2 text-sm">No courses match your search.</p>
+                  </div>
+                ) : (
+                  filteredCourses.map((course) => (
+                    <div key={course.id} className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 transition bg-gray-50/30">
+                      <div className="flex items-start justify-between">
+                        <div className="flex gap-3">
+                          <div className="h-11 w-11 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="material-symbols-outlined text-blue-900 text-xl">{course.icon}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
+                              <span>{course.level}</span> • <span>{course.department}</span>
+                            </div>
+                            <h3 className="font-bold text-blue-900 text-sm">{course.title}</h3>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <button className="text-blue-900 hover:bg-blue-50 p-1 rounded-full transition">
+                            <span className="material-symbols-outlined text-sm">library_add</span>
+                          </button>
+                          <button className="text-blue-900 hover:bg-blue-50 p-1 rounded-full transition">
+                            <span className="material-symbols-outlined text-sm">vpn_key</span>
+                          </button>
+                        </div>
+                      </div>
+                      {course.chapters?.length > 0 && (
+                        <div className="ml-14 mt-2 space-y-1 border-l-2 border-gray-100 pl-3">
+                          {course.chapters.map((chapter, idx) => (
+                            <div key={idx} className="flex justify-between items-center py-0.5 text-xs">
+                              <span className="text-gray-600">{chapter.name}</span>
+                              <span className="text-gray-400 ml-2 whitespace-nowrap">{chapter.modules} Modules</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Access Code Management */}
+          {showAccessCodes() && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="text-base font-bold text-blue-900 mb-4">Access Code Management</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-100">
+                    <tr className="text-xs text-gray-400">
+                      <th className="pb-2 text-left font-semibold">Course</th>
+                      <th className="pb-2 text-left font-semibold">Code</th>
+                      <th className="pb-2 text-left font-semibold">Uses</th>
+                      <th className="pb-2 text-left font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAccessCodes.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="py-4 text-center text-gray-400">No access codes match.</td>
+                      </tr>
+                    ) : (
+                      filteredAccessCodes.map((code) => (
+                        <tr key={code.id} className="border-b border-gray-50">
+                          <td className="py-2 text-gray-700 text-xs">{code.course}</td>
+                          <td className="py-2 font-mono text-blue-800 font-bold text-xs">{code.code}</td>
+                          <td className="py-2 text-gray-500 text-xs">{code.uses}</td>
+                          <td className="py-2">
+                            <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                              {code.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right Sidebar — 1 col */}
+        {/* Right sidebar */}
         <div className="space-y-6">
-
           {/* AI Insights */}
-          <div className="bg-blue-900 text-white rounded-xl p-5 shadow-lg">
-            <h2 className="text-base font-bold mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">smart_toy</span> AI Insights
-            </h2>
-            <div className="space-y-3">
-              {aiInsights.map((insight, idx) => (
-                <div key={idx} className="bg-white/10 p-3 rounded-lg">
-                  <p className="text-[10px] uppercase font-bold mb-1 text-blue-200">{insight.title}</p>
-                  <p className="text-xs text-blue-100">{insight.content}</p>
-                </div>
-              ))}
-              <button className="w-full bg-white text-blue-900 font-semibold py-2 rounded-lg hover:bg-gray-100 transition text-xs mt-1">
-                View Detailed Report
-              </button>
+          {showAiInsights() && (
+            <div className="bg-blue-900 text-white rounded-xl p-5 shadow-lg">
+              <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">smart_toy</span> AI Insights
+              </h2>
+              <div className="space-y-3">
+                {aiInsights.map((insight, idx) => (
+                  <div key={idx} className="bg-white/10 p-3 rounded-lg">
+                    <p className="text-[10px] uppercase font-bold mb-1 text-blue-200">{insight.title}</p>
+                    <p className="text-xs text-blue-100">{insight.content}</p>
+                  </div>
+                ))}
+                <button className="w-full bg-white text-blue-900 font-semibold py-2 rounded-lg hover:bg-gray-100 transition text-xs mt-1">
+                  View Detailed Report
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Student Tutors */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-bold text-blue-900 mb-3">Student Tutors</h2>
-            <div className="space-y-3">
-              {studentTutors.map((tutor) => (
-                <div key={tutor.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center font-bold text-blue-800 text-xs flex-shrink-0">
-                      {tutor.initials}
+          {showStudentTutors() && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="text-base font-bold text-blue-900 mb-3">Student Tutors</h2>
+              <div className="space-y-3">
+                {studentTutors.map((tutor) => (
+                  <div key={tutor.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center font-bold text-blue-800 text-xs flex-shrink-0">
+                        {tutor.initials}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{tutor.name}</p>
+                        <p className="text-[10px] text-gray-400">Rank #{tutor.rank} • {tutor.score}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{tutor.name}</p>
-                      <p className="text-[10px] text-gray-400">Rank #{tutor.rank} • {tutor.score}</p>
-                    </div>
+                    <button className="text-blue-700 text-xs font-semibold hover:underline">Assign</button>
                   </div>
-                  <button className="text-blue-700 text-xs font-semibold hover:underline">Assign</button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Upcoming Sessions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-base font-bold text-blue-900 mb-3">Upcoming Sessions</h2>
-            <div className="space-y-3">
-              {upcomingSessions.map((session, idx) => (
-                <div key={idx} className={`border-l-2 ${session.color || 'border-blue-900'} pl-3 py-0.5`}>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">
-                    {session.day} • {session.time}
-                  </p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{session.title}</p>
-                </div>
-              ))}
+          {showUpcomingSessions() && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="text-base font-bold text-blue-900 mb-3">Upcoming Sessions</h2>
+              <div className="space-y-3">
+                {upcomingSessions.map((session, idx) => (
+                  <div key={idx} className={`border-l-2 ${session.color || 'border-blue-900'} pl-3 py-0.5`}>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">
+                      {session.day} • {session.time}
+                    </p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{session.title}</p>
+                  </div>
+                ))}
+              </div>
+              <button className="w-full text-center text-blue-700 text-xs font-semibold mt-4 hover:underline">
+                Open Full Calendar
+              </button>
             </div>
-            <button className="w-full text-center text-blue-700 text-xs font-semibold mt-4 hover:underline">
-              Open Full Calendar
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

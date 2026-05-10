@@ -1,7 +1,7 @@
 // frontend/src/pages/auth/Login.jsx
 import { useState, useContext } from "react";
 import { GoogleLogin } from "@react-oauth/google";
-import { login, loginWithGoogle } from "../../api/auth";
+import { login, loginWithGoogle, submitProfessorApplication } from "../../api/auth";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 
@@ -11,6 +11,20 @@ function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  
+  // État de la modale professeur
+  const [showProfessorModal, setShowProfessorModal] = useState(false);
+  const [professorForm, setProfessorForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    subject: "",
+    message: "",
+    cv: null,
+  });
+  const [professorFormErrors, setProfessorFormErrors] = useState({});
+  const [submittingProfessor, setSubmittingProfessor] = useState(false);
+  const [professorSubmitSuccess, setProfessorSubmitSuccess] = useState(false);
 
   const navigate = useNavigate();
   const { loginUser } = useContext(AuthContext);
@@ -45,6 +59,82 @@ function Login() {
 
   const handleGoogleError = () => {
     setError("L'authentification Google a échoué");
+  };
+
+  // Gestion du formulaire professeur
+  const handleProfessorInputChange = (e) => {
+    const { name, value } = e.target;
+    setProfessorForm(prev => ({ ...prev, [name]: value }));
+    if (professorFormErrors[name]) {
+      setProfessorFormErrors(prev => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const handleProfessorFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === "application/pdf") {
+      setProfessorForm(prev => ({ ...prev, cv: file }));
+      if (professorFormErrors.cv) setProfessorFormErrors(prev => ({ ...prev, cv: "" }));
+    } else {
+      setProfessorFormErrors(prev => ({ ...prev, cv: "Veuillez sélectionner un fichier PDF" }));
+    }
+  };
+
+  const validateProfessorForm = () => {
+    const errors = {};
+    if (!professorForm.firstName.trim()) errors.firstName = "Prénom requis";
+    if (!professorForm.lastName.trim()) errors.lastName = "Nom requis";
+    if (!professorForm.email.trim()) {
+      errors.email = "Email requis";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(professorForm.email)) {
+      errors.email = "Email invalide";
+    }
+    if (!professorForm.subject.trim()) errors.subject = "Matière requise";
+    if (!professorForm.cv) errors.cv = "Veuillez joindre votre CV (PDF)";
+    return errors;
+  };
+
+  const handleProfessorSubmit = async (e) => {
+    e.preventDefault();
+    const errors = validateProfessorForm();
+    if (Object.keys(errors).length > 0) {
+      setProfessorFormErrors(errors);
+      return;
+    }
+
+    setSubmittingProfessor(true);
+    try {
+      // Appel API pour enregistrer la demande (notification à l'admin)
+      const formData = new FormData();
+      formData.append("firstName", professorForm.firstName);
+      formData.append("lastName", professorForm.lastName);
+      formData.append("email", professorForm.email);
+      formData.append("subject", professorForm.subject);
+      formData.append("message", professorForm.message || "");
+      if (professorForm.cv) formData.append("cv", professorForm.cv);
+
+      await submitProfessorApplication(formData);
+      setProfessorSubmitSuccess(true);
+      // Réinitialiser après 3 secondes et fermer la modale
+      setTimeout(() => {
+        setShowProfessorModal(false);
+        setProfessorForm({
+          firstName: "",
+          lastName: "",
+          email: "",
+          subject: "",
+          message: "",
+          cv: null,
+        });
+        setProfessorSubmitSuccess(false);
+        setProfessorFormErrors({});
+      }, 3000);
+    } catch (err) {
+      console.error("Erreur lors de l'envoi de la demande:", err);
+      setProfessorFormErrors({ general: err.response?.data?.message || "Erreur lors de l'envoi" });
+    } finally {
+      setSubmittingProfessor(false);
+    }
   };
 
   return (
@@ -183,7 +273,7 @@ function Login() {
                 </div>
               </div>
 
-              {/* Google Login Button - Style personnalisé */}
+              {/* Google Login Button */}
               <div className="relative">
                 {googleLoading ? (
                   <div className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -192,21 +282,21 @@ function Login() {
                   </div>
                 ) : (
                   <GoogleLogin
-  onSuccess={handleGoogleSuccess}
-  onError={handleGoogleError}
-  theme="outline"
-  size="large"
-  text="continue_with"
-  shape="pill"
-  logo_alignment="center"
-  width="100%"
-  containerProps={{ style: { width: '100%' } }}
-/>
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="outline"
+                    size="large"
+                    text="continue_with"
+                    shape="pill"
+                    logo_alignment="center"
+                    width="100%"
+                    containerProps={{ style: { width: '100%' } }}
+                  />
                 )}
               </div>
             </form>
 
-            {/* Professor CTA */}
+            {/* Professor CTA - modifié pour ouvrir la modale */}
             <div className="mt-10 p-4 bg-[#f1f3ff] rounded-xl flex items-center gap-4">
               <div className="w-11 h-11 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                 <span className="material-symbols-outlined text-[#00288e]">clinical_notes</span>
@@ -215,7 +305,12 @@ function Login() {
                 <p className="text-sm font-bold text-gray-800">Applying as a Professor?</p>
                 <p className="text-xs text-gray-500">Validation of credentials required.</p>
               </div>
-              <Link to="/register" className="text-[#00288e] font-bold text-sm underline whitespace-nowrap">Register</Link>
+              <button
+                onClick={() => setShowProfessorModal(true)}
+                className="text-[#00288e] font-bold text-sm underline whitespace-nowrap"
+              >
+                Register
+              </button>
             </div>
           </div>
 
@@ -229,6 +324,147 @@ function Login() {
           </footer>
         </div>
       </div>
+
+      {/* MODALE DEMANDE PROFESSEUR (scrolling) */}
+      {showProfessorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-[#00288e] flex items-center gap-2">
+                <span className="material-symbols-outlined">clinical_notes</span>
+                Demande d'inscription Professeur
+              </h2>
+              <button
+                onClick={() => setShowProfessorModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {professorSubmitSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-green-600 text-3xl">check_circle</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">Demande envoyée !</h3>
+                  <p className="text-gray-500">
+                    Votre demande a bien été transmise à l'administration. Vous serez notifié par email dès qu'un administrateur aura traité votre dossier.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleProfessorSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Prénom *</label>
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={professorForm.firstName}
+                        onChange={handleProfessorInputChange}
+                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none ${professorFormErrors.firstName ? 'border-red-500' : 'border-gray-200'}`}
+                      />
+                      {professorFormErrors.firstName && <p className="text-red-500 text-xs mt-1">{professorFormErrors.firstName}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Nom *</label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={professorForm.lastName}
+                        onChange={handleProfessorInputChange}
+                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none ${professorFormErrors.lastName ? 'border-red-500' : 'border-gray-200'}`}
+                      />
+                      {professorFormErrors.lastName && <p className="text-red-500 text-xs mt-1">{professorFormErrors.lastName}</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Email académique *</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={professorForm.email}
+                      onChange={handleProfessorInputChange}
+                      className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none ${professorFormErrors.email ? 'border-red-500' : 'border-gray-200'}`}
+                      placeholder="prenom.nom@academie.edu"
+                    />
+                    {professorFormErrors.email && <p className="text-red-500 text-xs mt-1">{professorFormErrors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Matière / Spécialité *</label>
+                    <input
+                      type="text"
+                      name="subject"
+                      value={professorForm.subject}
+                      onChange={handleProfessorInputChange}
+                      className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none ${professorFormErrors.subject ? 'border-red-500' : 'border-gray-200'}`}
+                      placeholder="Ex: Mathématiques, Littérature francaise"
+                    />
+                    {professorFormErrors.subject && <p className="text-red-500 text-xs mt-1">{professorFormErrors.subject}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Message / Lettre de motivation</label>
+                    <textarea
+                      name="message"
+                      rows="4"
+                      value={professorForm.message}
+                      onChange={handleProfessorInputChange}
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none resize-none"
+                      placeholder="Parlez-nous de votre expérience, de votre approche pédagogique..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">CV (PDF) *</label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleProfessorFileChange}
+                      className={`w-full p-2 border rounded-xl focus:ring-2 focus:ring-[#00288e] outline-none ${professorFormErrors.cv ? 'border-red-500' : 'border-gray-200'}`}
+                    />
+                    {professorFormErrors.cv && <p className="text-red-500 text-xs mt-1">{professorFormErrors.cv}</p>}
+                    <p className="text-xs text-gray-400 mt-1">Format PDF uniquement, max 5 Mo</p>
+                  </div>
+
+                  {professorFormErrors.general && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                      {professorFormErrors.general}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowProfessorModal(false)}
+                      className="px-6 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingProfessor}
+                      className="px-6 py-2.5 bg-[#00288e] text-white rounded-xl hover:bg-[#1e40af] transition disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {submittingProfessor ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Envoi en cours...
+                        </>
+                      ) : (
+                        "Envoyer la demande"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

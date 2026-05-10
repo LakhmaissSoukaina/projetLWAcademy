@@ -13,6 +13,17 @@ export default function StudentAssignment() {
     nextDeadline: null
   });
 
+  // 🔍 Recherche globale (depuis la StudentNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchAssignments();
   }, []);
@@ -23,14 +34,11 @@ export default function StudentAssignment() {
       const data = await getStudentAssignments();
       setAssignments(data);
       
-      // Calculer les statistiques
       const pending = data.filter(a => a.status === "pending" || a.status === "À Faire").length;
       const graded = data.filter(a => a.grade);
       const avgGrade = graded.length > 0 
         ? (graded.reduce((acc, a) => acc + a.grade, 0) / graded.length).toFixed(1)
         : 0;
-      
-      // Prochain délai
       const upcoming = data
         .filter(a => a.status === "pending")
         .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))[0];
@@ -44,7 +52,6 @@ export default function StudentAssignment() {
       
     } catch (error) {
       console.error("Error loading assignments:", error);
-      // Données mockées
       setAssignments([
         { id: 1, title: "Analyse Comparative: Voltaire vs Rousseau", description: "Rédiger un essai de 1500 mots sur la notion de contrat social.", deadline: "2023-10-15", status: "pending", color: "blue" },
         { id: 2, title: "Probabilités et Statistiques Appliquées", description: "Résolution de la série d'exercices n°4 sur les variables aléatoires.", deadline: "2023-10-08", status: "submitted", color: "gray", grade: null },
@@ -60,10 +67,9 @@ export default function StudentAssignment() {
   const handleUpload = async (assignmentId, file) => {
     const formData = new FormData();
     formData.append("file", file);
-    
     try {
       await submitAssignment(assignmentId, formData);
-      await fetchAssignments(); // Rafraîchir la liste
+      await fetchAssignments();
       alert("Devoir soumis avec succès !");
     } catch (error) {
       console.error("Error submitting assignment:", error);
@@ -93,6 +99,17 @@ export default function StudentAssignment() {
     return diffDays;
   };
 
+  // 🔍 Filtrer les devoirs
+  const filteredAssignments = assignments.filter(assignment => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return (
+      assignment.title.toLowerCase().includes(term) ||
+      assignment.description.toLowerCase().includes(term) ||
+      (assignment.status && getStatusConfig(assignment.status).label.toLowerCase().includes(term))
+    );
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -119,6 +136,18 @@ export default function StudentAssignment() {
           <p className="text-2xl text-gray-500 max-w-3xl leading-relaxed">
             Consultez vos travaux en cours, téléchargez vos documents et suivez vos résultats académiques.
           </p>
+          {globalSearchTerm && (
+            <div className="mt-6 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+              <span className="material-symbols-outlined text-sm">search</span>
+              Showing assignments matching: <strong>{globalSearchTerm}</strong>
+              <button
+                onClick={() => setGlobalSearchTerm("")}
+                className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
         </header>
 
         {/* CARDS */}
@@ -130,7 +159,6 @@ export default function StudentAssignment() {
               <span className="text-gray-500 mb-2">Devoirs actifs</span>
             </div>
           </div>
-
           <div className="bg-white rounded-3xl shadow-sm p-8 border-l-4 border-gray-700">
             <p className="uppercase tracking-widest text-sm text-gray-400 mb-4">Moyenne Générale</p>
             <div className="flex items-end gap-3">
@@ -138,7 +166,6 @@ export default function StudentAssignment() {
               <span className="text-gray-500 mb-2">/ 20</span>
             </div>
           </div>
-
           <div className="bg-white rounded-3xl shadow-sm p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/5 to-transparent"></div>
             <div className="relative z-10">
@@ -153,62 +180,82 @@ export default function StudentAssignment() {
           </div>
         </div>
 
-        {/* TABLE */}
+        {/* TABLEAU */}
         <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
           <div className="p-8 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-3xl font-bold text-blue-900">Liste des Travaux</h3>
-            <button className="px-5 py-3 rounded-xl border border-blue-700 text-blue-700 hover:bg-blue-50 transition">
-              🔍 Filtrer
-            </button>
+            <h3 className="text-3xl font-bold text-blue-900">
+              Liste des Travaux
+              {globalSearchTerm && (
+                <span className="ml-3 text-base font-normal text-gray-500">
+                  ({filteredAssignments.length} résultat(s))
+                </span>
+              )}
+            </h3>
+            {/* Le bouton "Filtrer" a été supprimé */}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
-                <tr className="text-left text-sm uppercase tracking-widest text-gray-400">
-                  <th className="px-8 py-5">Titre & Instruction</th>
-                  <th className="px-8 py-5">Date Limite</th>
-                  <th className="px-8 py-5">Statut</th>
-                  <th className="px-8 py-5">Action / Note</th>
+                <tr>
+                  <th className="px-8 py-5 text-left text-sm uppercase tracking-widest text-gray-400">Titre & Instruction</th>
+                  <th className="px-8 py-5 text-left text-sm uppercase tracking-widest text-gray-400">Date Limite</th>
+                  <th className="px-8 py-5 text-left text-sm uppercase tracking-widest text-gray-400">Statut</th>
+                  <th className="px-8 py-5 text-left text-sm uppercase tracking-widest text-gray-400">Action / Note</th>
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((item, i) => {
-                  const statusConfig = getStatusConfig(item.status);
-                  return (
-                    <tr key={item.id || i} className="border-t border-gray-100 hover:bg-blue-50/30 transition">
-                      <td className="px-8 py-6">
-                        <div>
-                          <h4 className="font-bold text-lg mb-2">{item.title}</h4>
-                          <p className="text-gray-500">{item.description}</p>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <span>📅</span>
-                          <span>{formatDate(item.deadline)}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className={`px-4 py-2 rounded-full text-xs font-bold uppercase ${statusConfig.color}`}>
-                          {statusConfig.label}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6">
-                        {item.status === "graded" ? (
-                          <div className="flex items-center gap-4">
-                            <span className="text-2xl font-bold">{item.grade}/20</span>
-                            <button className="hover:scale-110 transition">👁</button>
+                {filteredAssignments.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-8 py-12 text-center text-gray-400">
+                      <span className="material-symbols-outlined text-4xl">search_off</span>
+                      <p className="mt-2">Aucun devoir ne correspond à votre recherche.</p>
+                      <button
+                        onClick={() => setGlobalSearchTerm("")}
+                        className="mt-3 text-blue-700 font-semibold hover:underline"
+                      >
+                        Effacer la recherche
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAssignments.map((item) => {
+                    const statusConfig = getStatusConfig(item.status);
+                    return (
+                      <tr key={item.id} className="border-t border-gray-100 hover:bg-blue-50/30 transition">
+                        <td className="px-8 py-6">
+                          <div>
+                            <h4 className="font-bold text-lg mb-2">{item.title}</h4>
+                            <p className="text-gray-500">{item.description}</p>
                           </div>
-                        ) : (
-                          <button className="font-semibold hover:underline text-blue-700">
-                            {statusConfig.action}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <span>📅</span>
+                            <span>{formatDate(item.deadline)}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className={`px-4 py-2 rounded-full text-xs font-bold uppercase ${statusConfig.color}`}>
+                            {statusConfig.label}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
+                          {item.status === "graded" ? (
+                            <div className="flex items-center gap-4">
+                              <span className="text-2xl font-bold">{item.grade}/20</span>
+                              <button className="hover:scale-110 transition">👁</button>
+                            </div>
+                          ) : (
+                            <button className="font-semibold hover:underline text-blue-700">
+                              {statusConfig.action}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -216,15 +263,14 @@ export default function StudentAssignment() {
           {/* FOOTER */}
           <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
             <p className="text-sm text-gray-500">
-              Affichage de {assignments.length} devoirs
+              {globalSearchTerm 
+                ? `Affichage de ${filteredAssignments.length} devoir(s) correspondant(s) à la recherche`
+                : `Affichage de ${assignments.length} devoirs`
+              }
             </p>
             <div className="flex gap-3">
-              <button className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-white transition">
-                ←
-              </button>
-              <button className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-white transition">
-                →
-              </button>
+              <button className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-white transition">←</button>
+              <button className="w-10 h-10 rounded-lg border border-gray-200 hover:bg-white transition">→</button>
             </div>
           </div>
         </div>

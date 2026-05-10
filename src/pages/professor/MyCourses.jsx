@@ -3,13 +3,25 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { getProfessorCourses, createCourse, updateCourse } from "../../api/professorApi";
-import api from "../../api/axios"; 
+import api from "../../api/axios";
+
 export default function MyCourses() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState("general");
   const [loading, setLoading] = useState(false);
   const [existingCourses, setExistingCourses] = useState([]);
+  
+  // 🔍 Recherche globale (depuis la ProfessorNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
   
   // États du formulaire
   const [courseTitle, setCourseTitle] = useState("");
@@ -168,7 +180,6 @@ export default function MyCourses() {
     
     setLoading(true);
     try {
-      // Sauvegarder la structure finale
       if (courseId) {
         await updateCourse(courseId, {
           chapters,
@@ -532,6 +543,19 @@ export default function MyCourses() {
               Design a premium bilingual learning experience for your students.
             </p>
           </div>
+          {/* Badge de recherche */}
+          {globalSearchTerm && (
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+              <span className="material-symbols-outlined text-sm">search</span>
+              Search: <strong>{globalSearchTerm}</strong>
+              <button
+                onClick={() => setGlobalSearchTerm("")}
+                className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Main Grid Layout */}

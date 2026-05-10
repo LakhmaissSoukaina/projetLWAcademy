@@ -1,3 +1,4 @@
+// src/components/professor/ProfessorNavbar.jsx
 import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,9 @@ export default function ProfessorNavbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [language, setLanguage] = useState("fr");
+  
+  // 🔍 État local pour la recherche
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Traductions
   const translations = {
@@ -60,6 +64,20 @@ export default function ProfessorNavbar() {
     navigate("/login");
   };
 
+  // 🔍 Gestion de la recherche + émission d'événement
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    // Émettre un événement que les pages pourront écouter
+    window.dispatchEvent(new CustomEvent("searchTermChange", { detail: value }));
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      console.log("Recherche soumise :", searchTerm);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 h-16 bg-white border-b border-gray-100 shadow-[0_4px_20px_rgba(30,64,175,0.05)]">
       <div className="flex justify-between items-center h-full px-6 lg:px-8">
@@ -73,6 +91,9 @@ export default function ProfessorNavbar() {
               className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full w-56 lg:w-64 text-sm focus:ring-2 focus:ring-blue-200 focus:bg-white focus:border-transparent transition-all outline-none" 
               placeholder={t.search} 
               type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyDown={handleKeyDown}
             />
           </div>
           <nav className="hidden lg:flex gap-6">
@@ -83,7 +104,7 @@ export default function ProfessorNavbar() {
           </nav>
         </div>
 
-        {/* Right Side */}
+        {/* Right Side - inchangé */}
         <div className="flex items-center gap-2">
           {/* Language Selector */}
           <div className="relative">

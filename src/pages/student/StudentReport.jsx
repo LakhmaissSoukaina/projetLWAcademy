@@ -23,6 +23,17 @@ export default function StudentReport() {
   const [previousReports, setPreviousReports] = useState([]);
   const [previousPlans, setPreviousPlans] = useState([]);
 
+  // 🔍 Recherche globale (depuis la StudentNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchReport();
     fetchAIData();
@@ -135,6 +146,21 @@ export default function StudentReport() {
     return "#ef4444";
   };
 
+  // === DÉFINITION DES SECTIONS AVEC MOTS‑CLÉS ===
+  const sections = [
+    { id: "hero", title: "Section Score, AI Insight, Badges", keywords: ["score", "insight", "badges", "résultat"] },
+    { id: "questions", title: "Question Breakdown", keywords: ["question", "breakdown", "réponses"] },
+    { id: "recommendations", title: "Revision Recommendations", keywords: ["recommandations", "recommendations", "revision"] },
+    { id: "history", title: "Historique IA", keywords: ["historique", "history", "ia", "rapports", "plans"] },
+    { id: "actions", title: "Actions (Retake Quiz, Next Lesson)", keywords: ["actions", "retake", "next", "quiz", "lesson"] }
+  ];
+
+  const isSectionVisible = (keywords) => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return keywords.some(kw => kw.toLowerCase().includes(term));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -169,7 +195,7 @@ export default function StudentReport() {
           <span className="text-blue-800 font-semibold">Quiz Result</span>
         </nav>
 
-        {/* BOUTONS IA EN HAUT */}
+        {/* BOUTONS IA EN HAUT (toujours visibles) */}
         <div className="flex justify-end gap-3 mb-6">
           <button 
             onClick={handleGenerateReport}
@@ -189,158 +215,180 @@ export default function StudentReport() {
           </button>
         </div>
 
-        {/* HERO SECTION */}
-        <section className="grid grid-cols-12 gap-8 mb-14">
-          {/* SCORE CARD */}
-          <div className="col-span-12 lg:col-span-4 bg-white rounded-3xl shadow-sm p-10 flex flex-col items-center justify-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-5 bg-[radial-gradient(circle_at_50%_-20%,#1e40af,transparent)]" />
-            <div className="relative w-52 h-52 mb-6">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 220 220">
-                <circle cx="110" cy="110" r="90" stroke="#e5e7eb" strokeWidth="12" fill="none" />
-                <circle
-                  cx="110"
-                  cy="110"
-                  r="90"
-                  stroke={getProgressColor(score)}
-                  strokeWidth="12"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <h1 className={`text-5xl font-bold ${scoreColor}`}>{score}%</h1>
-                <p className="uppercase tracking-widest text-gray-500 text-sm mt-2">{scoreMessage}</p>
+        {/* Badge de recherche (affiché si recherche active) */}
+        {globalSearchTerm && (
+          <div className="mb-6 flex justify-end">
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+              <span className="material-symbols-outlined text-sm">search</span>
+              Showing only sections matching: <strong>{globalSearchTerm}</strong>
+              <button
+                onClick={() => setGlobalSearchTerm("")}
+                className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HERO SECTION (Score, AI Insight, Badges) */}
+        {isSectionVisible(sections.find(s => s.id === "hero").keywords) && (
+          <section className="grid grid-cols-12 gap-8 mb-14">
+            {/* SCORE CARD */}
+            <div className="col-span-12 lg:col-span-4 bg-white rounded-3xl shadow-sm p-10 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-5 bg-[radial-gradient(circle_at_50%_-20%,#1e40af,transparent)]" />
+              <div className="relative w-52 h-52 mb-6">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 220 220">
+                  <circle cx="110" cy="110" r="90" stroke="#e5e7eb" strokeWidth="12" fill="none" />
+                  <circle
+                    cx="110"
+                    cy="110"
+                    r="90"
+                    stroke={getProgressColor(score)}
+                    strokeWidth="12"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <h1 className={`text-5xl font-bold ${scoreColor}`}>{score}%</h1>
+                  <p className="uppercase tracking-widest text-gray-500 text-sm mt-2">{scoreMessage}</p>
+                </div>
               </div>
+              <p className="text-center text-gray-600">
+                You passed the<br />
+                <span className="font-bold text-[#141b2b]">{report.title}</span>
+              </p>
             </div>
-            <p className="text-center text-gray-600">
-              You passed the<br />
-              <span className="font-bold text-[#141b2b]">{report.title}</span>
-            </p>
-          </div>
 
-          {/* AI INSIGHT */}
-          <div className="col-span-12 lg:col-span-5 bg-white rounded-3xl shadow-sm p-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-2xl">✨</div>
-              <h2 className="text-2xl font-bold text-blue-900">AI Insight</h2>
-            </div>
-            <p className="text-lg italic text-gray-700 leading-relaxed mb-8">
-              "{report.aiInsight}"
-            </p>
-            <div className="space-y-5">
-              {report.strengths?.map((strength, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="text-green-600 text-xl">✓</span>
-                  <div>
-                    <p className="uppercase text-xs tracking-widest text-gray-400">Strength</p>
-                    <p className="font-semibold">{strength}</p>
+            {/* AI INSIGHT */}
+            <div className="col-span-12 lg:col-span-5 bg-white rounded-3xl shadow-sm p-10">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-2xl">✨</div>
+                <h2 className="text-2xl font-bold text-blue-900">AI Insight</h2>
+              </div>
+              <p className="text-lg italic text-gray-700 leading-relaxed mb-8">
+                "{report.aiInsight}"
+              </p>
+              <div className="space-y-5">
+                {report.strengths?.map((strength, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="text-green-600 text-xl">✓</span>
+                    <div>
+                      <p className="uppercase text-xs tracking-widest text-gray-400">Strength</p>
+                      <p className="font-semibold">{strength}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {report.weaknesses?.map((weakness, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="text-red-500 text-xl">!</span>
-                  <div>
-                    <p className="uppercase text-xs tracking-widest text-gray-400">Growth Area</p>
-                    <p className="font-semibold">{weakness}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* BADGES */}
-          <div className="col-span-12 lg:col-span-3 bg-blue-800 rounded-3xl shadow-sm p-8 text-white flex flex-col justify-between">
-            <div>
-              <p className="uppercase tracking-widest text-sm opacity-80 mb-6">Badges Earned</p>
-              <div className="flex gap-4">
-                {report.badges?.map((badge, i) => (
-                  <div key={i} className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl">
-                    🎖️
+                ))}
+                {report.weaknesses?.map((weakness, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="text-red-500 text-xl">!</span>
+                    <div>
+                      <p className="uppercase text-xs tracking-widest text-gray-400">Growth Area</p>
+                      <p className="font-semibold">{weakness}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mt-10">
-              <p className="text-sm opacity-80 mb-3">Next Badge: {report.nextBadge}</p>
-              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full" style={{ width: `${report.nextBadgeProgress}%` }} />
+
+            {/* BADGES */}
+            <div className="col-span-12 lg:col-span-3 bg-blue-800 rounded-3xl shadow-sm p-8 text-white flex flex-col justify-between">
+              <div>
+                <p className="uppercase tracking-widest text-sm opacity-80 mb-6">Badges Earned</p>
+                <div className="flex gap-4">
+                  {report.badges?.map((badge, i) => (
+                    <div key={i} className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl">
+                      🎖️
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-10">
+                <p className="text-sm opacity-80 mb-3">Next Badge: {report.nextBadge}</p>
+                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-white rounded-full" style={{ width: `${report.nextBadgeProgress}%` }} />
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* QUESTION BREAKDOWN */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-blue-900 mb-8">Question Breakdown</h2>
-          <div className="space-y-8">
-            {questions.map((question, index) => (
-              <div key={question.id} className={`bg-white rounded-3xl shadow-sm p-8 border-l-4 ${question.isCorrect ? 'border-blue-700' : 'border-red-500'}`}>
-                <div className="flex items-center gap-4 mb-5">
-                  <span className="bg-blue-50 text-blue-800 px-4 py-1 rounded-full text-sm font-bold">
-                    Question {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className={question.isCorrect ? "text-green-600 font-semibold" : "text-red-500 font-semibold"}>
-                    {question.isCorrect ? "✓ Correct" : "✕ Incorrect"}
-                  </span>
-                </div>
-
-                <h3 className="text-2xl font-bold mb-8">{question.text}</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className={question.isCorrect ? "bg-blue-50 rounded-2xl p-6" : "bg-red-50 rounded-2xl p-6"}>
-                    <p className="text-sm uppercase tracking-widest text-gray-400 mb-2">Your Answer</p>
-                    <p className={`font-semibold italic ${question.isCorrect ? "text-blue-800" : "text-red-500"}`}>
-                      "{question.userAnswer}"
-                    </p>
+        {isSectionVisible(sections.find(s => s.id === "questions").keywords) && (
+          <section className="mb-16">
+            <h2 className="text-3xl font-bold text-blue-900 mb-8">Question Breakdown</h2>
+            <div className="space-y-8">
+              {questions.map((question, index) => (
+                <div key={question.id} className={`bg-white rounded-3xl shadow-sm p-8 border-l-4 ${question.isCorrect ? 'border-blue-700' : 'border-red-500'}`}>
+                  <div className="flex items-center gap-4 mb-5">
+                    <span className="bg-blue-50 text-blue-800 px-4 py-1 rounded-full text-sm font-bold">
+                      Question {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className={question.isCorrect ? "text-green-600 font-semibold" : "text-red-500 font-semibold"}>
+                      {question.isCorrect ? "✓ Correct" : "✕ Incorrect"}
+                    </span>
                   </div>
-                  <div className="bg-gray-50 rounded-2xl p-6">
-                    <p className="text-sm uppercase tracking-widest text-gray-400 mb-2">Model Solution</p>
-                    <p className="font-semibold">{question.correctAnswer}</p>
+
+                  <h3 className="text-2xl font-bold mb-8">{question.text}</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className={question.isCorrect ? "bg-blue-50 rounded-2xl p-6" : "bg-red-50 rounded-2xl p-6"}>
+                      <p className="text-sm uppercase tracking-widest text-gray-400 mb-2">Your Answer</p>
+                      <p className={`font-semibold italic ${question.isCorrect ? "text-blue-800" : "text-red-500"}`}>
+                        "{question.userAnswer}"
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl p-6">
+                      <p className="text-sm uppercase tracking-widest text-gray-400 mb-2">Model Solution</p>
+                      <p className="font-semibold">{question.correctAnswer}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t">
+                    <p className="italic text-gray-600">🤖 AI Feedback: {question.feedback}</p>
                   </div>
                 </div>
-
-                <div className="mt-6 pt-6 border-t">
-                  <p className="italic text-gray-600">🤖 AI Feedback: {question.feedback}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* RECOMMENDATIONS */}
-        <section className="bg-blue-50/40 rounded-3xl p-10 mb-16">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
-            <div>
-              <h2 className="text-3xl font-bold text-blue-900">Revision Recommendations</h2>
-              <p className="text-gray-600 mt-2">Focus on these modules to improve your weak areas.</p>
+        {isSectionVisible(sections.find(s => s.id === "recommendations").keywords) && (
+          <section className="bg-blue-50/40 rounded-3xl p-10 mb-16">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
+              <div>
+                <h2 className="text-3xl font-bold text-blue-900">Revision Recommendations</h2>
+                <p className="text-gray-600 mt-2">Focus on these modules to improve your weak areas.</p>
+              </div>
+              <button className="bg-blue-800 text-white px-8 py-4 rounded-2xl hover:bg-blue-900 transition">
+                Study All
+              </button>
             </div>
-            <button className="bg-blue-800 text-white px-8 py-4 rounded-2xl hover:bg-blue-900 transition">
-              Study All
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {report.weaknesses?.map((weakness, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm hover:translate-x-1 transition">
-                <div className="flex items-center gap-5">
-                  <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl">
-                    {i === 0 ? "▶" : "📄"}
-                  </div>
-                  <div>
-                    <p className="text-sm uppercase tracking-widest text-blue-800 font-semibold">Module {i + 4}.{i + 2}</p>
-                    <h4 className="text-xl font-bold">Review: {weakness}</h4>
-                    <p className="text-sm text-gray-500">12 min video • Interactive practice</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {report.weaknesses?.map((weakness, i) => (
+                <div key={i} className="bg-white rounded-2xl p-6 shadow-sm hover:translate-x-1 transition">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl">
+                      {i === 0 ? "▶" : "📄"}
+                    </div>
+                    <div>
+                      <p className="text-sm uppercase tracking-widest text-blue-800 font-semibold">Module {i + 4}.{i + 2}</p>
+                      <h4 className="text-xl font-bold">Review: {weakness}</h4>
+                      <p className="text-sm text-gray-500">12 min video • Interactive practice</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* HISTORIQUE DES RAPPORTS IA */}
-        {(previousReports.length > 0 || previousPlans.length > 0) && (
+        {isSectionVisible(sections.find(s => s.id === "history").keywords) && (previousReports.length > 0 || previousPlans.length > 0) && (
           <section className="mb-16">
             <h2 className="text-2xl font-bold text-blue-900 mb-6">📋 Historique IA</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -380,18 +428,20 @@ export default function StudentReport() {
           </section>
         )}
 
-        {/* ACTIONS */}
-        <div className="flex flex-col md:flex-row justify-center gap-6 pb-10">
-          <button className="px-10 py-4 border-2 border-blue-800 text-blue-800 rounded-2xl hover:bg-blue-50 transition">
-            Retake Quiz
-          </button>
-          <button 
-            onClick={() => navigate("/student/courses")}
-            className="px-10 py-4 bg-blue-800 text-white rounded-2xl hover:bg-blue-900 shadow-lg transition"
-          >
-            Next Lesson
-          </button>
-        </div>
+        {/* ACTIONS (Retake Quiz, Next Lesson) */}
+        {isSectionVisible(sections.find(s => s.id === "actions").keywords) && (
+          <div className="flex flex-col md:flex-row justify-center gap-6 pb-10">
+            <button className="px-10 py-4 border-2 border-blue-800 text-blue-800 rounded-2xl hover:bg-blue-50 transition">
+              Retake Quiz
+            </button>
+            <button 
+              onClick={() => navigate("/student/courses")}
+              className="px-10 py-4 bg-blue-800 text-white rounded-2xl hover:bg-blue-900 shadow-lg transition"
+            >
+              Next Lesson
+            </button>
+          </div>
+        )}
       </main>
 
       {/* MODAL RAPPORT IA */}

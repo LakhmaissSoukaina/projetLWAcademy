@@ -11,6 +11,17 @@ export default function StudentCourses() {
   const [selectedLevel, setSelectedLevel] = useState("All Levels");
   const [viewMode, setViewMode] = useState("grid");
 
+  // 🔍 Recherche globale (depuis la Navbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchCourses();
   }, []);
@@ -22,7 +33,7 @@ export default function StudentCourses() {
       setCourses(data);
     } catch (error) {
       console.error("Error loading courses:", error);
-      // Données mockées pour le développement
+      // Données mockées (avec images conservées)
       setCourses([
         {
           id: 1,
@@ -88,10 +99,22 @@ export default function StudentCourses() {
     return ["All Levels", ...new Set(levels)];
   };
 
+  // Filtrage : combine les filtres classiques + recherche globale (titre, catégorie, professeur, niveau)
   const filteredCourses = courses.filter(course => {
     const matchesSubject = selectedSubject === "All Subjects" || course.category === selectedSubject;
     const matchesLevel = selectedLevel === "All Levels" || course.level === selectedLevel;
-    return matchesSubject && matchesLevel;
+    
+    let matchesGlobal = true;
+    if (globalSearchTerm.trim()) {
+      const term = globalSearchTerm.toLowerCase();
+      matchesGlobal = 
+        course.title.toLowerCase().includes(term) ||
+        course.category.toLowerCase().includes(term) ||
+        course.professor.toLowerCase().includes(term) ||
+        course.level.toLowerCase().includes(term);
+    }
+    
+    return matchesSubject && matchesLevel && matchesGlobal;
   });
 
   const getInitials = (name) => {
@@ -108,7 +131,7 @@ export default function StudentCourses() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Header avec badge de recherche */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
           <h1 className="text-4xl font-black text-blue-800 mb-2">
@@ -117,6 +140,18 @@ export default function StudentCourses() {
           <p className="text-gray-500 max-w-2xl">
             Continue your academic journey and track your progress through our specialized curriculum.
           </p>
+          {globalSearchTerm && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+              <span className="material-symbols-outlined text-sm">search</span>
+              Filtered by: <strong>{globalSearchTerm}</strong>
+              <button
+                onClick={() => setGlobalSearchTerm("")}
+                className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
         </div>
         <button className="bg-blue-700 hover:bg-blue-800 transition-all text-white px-6 py-4 rounded-2xl flex items-center gap-2 font-semibold shadow-lg">
           <span className="material-symbols-outlined">qr_code_scanner</span>
@@ -124,7 +159,7 @@ export default function StudentCourses() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filtres existants (catégorie et niveau) */}
       <div className="flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
         <div className="flex items-center gap-3">
           <span className="font-semibold text-gray-600">Filter by:</span>
@@ -169,14 +204,14 @@ export default function StudentCourses() {
         </div>
       </div>
 
-      {/* Courses Grid */}
+      {/* Grille des cours */}
       <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-8">
         {filteredCourses.map((course) => (
           <div
             key={course.id}
             className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:-translate-y-2 hover:shadow-xl transition-all duration-500 group"
           >
-            {/* Image */}
+            {/* Image (conservée) */}
             <div className="relative h-56 overflow-hidden">
               {course.image ? (
                 <img
@@ -197,7 +232,7 @@ export default function StudentCourses() {
               </span>
             </div>
 
-            {/* Content */}
+            {/* Contenu */}
             <div className="p-8">
               <span className="text-xs uppercase tracking-widest text-blue-700 font-bold block mb-2">
                 {course.category}
@@ -229,18 +264,38 @@ export default function StudentCourses() {
           </div>
         ))}
 
-        {/* Explore More Card */}
-        <div className="border-2 border-dashed border-gray-300 rounded-3xl bg-white/50 flex flex-col items-center justify-center text-center p-10 hover:border-blue-700 transition-all cursor-pointer group min-h-[450px]">
-          <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-6 group-hover:bg-blue-700 transition-all">
-            <span className="material-symbols-outlined text-4xl text-gray-500 group-hover:text-white">
-              add
-            </span>
+        {/* Carte "Explore More" (affichée seulement si des cours sont visibles) */}
+        {filteredCourses.length > 0 && (
+          <div className="border-2 border-dashed border-gray-300 rounded-3xl bg-white/50 flex flex-col items-center justify-center text-center p-10 hover:border-blue-700 transition-all cursor-pointer group min-h-[450px]">
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-6 group-hover:bg-blue-700 transition-all">
+              <span className="material-symbols-outlined text-4xl text-gray-500 group-hover:text-white">
+                add
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">Explore More</h2>
+            <p className="text-gray-500 mb-6">Discover new subjects from our world-class faculty</p>
+            <button className="text-blue-700 font-bold hover:underline">View Course Catalog</button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">Explore More</h2>
-          <p className="text-gray-500 mb-6">Discover new subjects from our world-class faculty</p>
-          <button className="text-blue-700 font-bold hover:underline">View Course Catalog</button>
-        </div>
+        )}
       </div>
+
+      {/* Message si aucun résultat */}
+      {filteredCourses.length === 0 && (
+        <div className="text-center py-12">
+          <span className="material-symbols-outlined text-6xl text-gray-300">search_off</span>
+          <p className="text-gray-500 mt-4">No courses match your search criteria.</p>
+          <button
+            onClick={() => {
+              setSelectedSubject("All Subjects");
+              setSelectedLevel("All Levels");
+              setGlobalSearchTerm("");
+            }}
+            className="mt-4 text-blue-700 font-semibold hover:underline"
+          >
+            Clear all filters
+          </button>
+        </div>
+      )}
     </div>
   );
 }

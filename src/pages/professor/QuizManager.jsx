@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { getProfessorQuizzes, createQuiz, updateQuiz, deleteQuiz, getQuizResults } from "../../api/professorApi";
 import api from "../../api/axios";
+
 export default function QuizManager() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,17 @@ export default function QuizManager() {
   const [quizTotalPoints, setQuizTotalPoints] = useState(100);
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // 🔍 Recherche globale (depuis la ProfessorNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
 
   useEffect(() => {
     fetchQuizzes();
@@ -224,6 +236,17 @@ export default function QuizManager() {
     }
   };
 
+  // 🔍 Filtrage des quizzes (titre, cours associé, statut)
+  const filteredQuizzes = quizzes.filter(quiz => {
+    if (!globalSearchTerm.trim()) return true;
+    const term = globalSearchTerm.toLowerCase();
+    return (
+      (quiz.title && quiz.title.toLowerCase().includes(term)) ||
+      (quiz.course?.title && quiz.course.title.toLowerCase().includes(term)) ||
+      (quiz.status && quiz.status.toLowerCase().includes(term))
+    );
+  });
+
   const totalPoints = calculateTotalPoints();
   const estimatedDuration = Math.ceil(totalPoints / 2);
 
@@ -247,6 +270,18 @@ export default function QuizManager() {
             <h1 className="text-3xl font-bold text-blue-900">
               {selectedQuiz ? `Modifier: ${quizTitle}` : "Nouveau Quiz"}
             </h1>
+            {globalSearchTerm && (
+              <div className="mt-2 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span className="material-symbols-outlined text-sm">search</span>
+                Global: <strong>{globalSearchTerm}</strong>
+                <button
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex gap-3">
             <button 
@@ -496,12 +531,19 @@ export default function QuizManager() {
               </div>
             </div>
 
-            {/* Liste des quizzes existants */}
+            {/* Liste des quizzes - FILTRÉE */}
             {quizzes.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-                <h3 className="font-semibold text-slate-800 mb-3">Mes quizzes</h3>
+                <h3 className="font-semibold text-slate-800 mb-3">
+                  Mes quizzes
+                  {globalSearchTerm && filteredQuizzes.length !== quizzes.length && (
+                    <span className="ml-2 text-xs font-normal text-slate-400">
+                      ({filteredQuizzes.length} affichés sur {quizzes.length})
+                    </span>
+                  )}
+                </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {quizzes.map(quiz => (
+                  {filteredQuizzes.map(quiz => (
                     <div key={quiz.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
                       <button onClick={() => loadQuiz(quiz)} className="text-left flex-1">
                         <p className="text-sm font-medium text-slate-700">{quiz.title}</p>
@@ -512,6 +554,11 @@ export default function QuizManager() {
                       </button>
                     </div>
                   ))}
+                  {filteredQuizzes.length === 0 && globalSearchTerm && (
+                    <p className="text-sm text-slate-400 text-center py-2">
+                      Aucun quiz ne correspond à "{globalSearchTerm}"
+                    </p>
+                  )}
                 </div>
               </div>
             )}
