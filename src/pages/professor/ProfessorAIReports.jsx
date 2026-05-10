@@ -1,8 +1,12 @@
 // src/pages/admin/AIReports.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { getAIReports, generateAIReport, getAISystemStats } from "../../api/adminApi";
-import api from "../../api/axios";
+import { 
+  getProfessorAIReports, 
+  generateAIReport, 
+  generateClassReport,  // ← Assure-toi que c'est importé
+  getAISuggestions 
+} from "../../api/professorApi";import api from "../../api/axios";
 
 export default function AIReports() {
   const { user } = useAuth();
@@ -80,18 +84,18 @@ export default function AIReports() {
   };
 
   const handleGenerateClassReport = async () => {
-    setGeneratingReport(true);
-    setShowClassReportModal(true);
-    try {
-      const result = await generateAIReport("global_report");
-      setClassReport(result);
-    } catch (error) {
-      console.error("Error generating class report:", error);
-      setClassReport({ report: "Erreur lors de la génération du rapport", success: false });
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
+  setGeneratingReport(true);
+  setShowClassReportModal(true);
+  try {
+    const result = await generateClassReport(); // ← Utilise la bonne fonction
+    setClassReport(result);
+  } catch (error) {
+    console.error("Error generating class report:", error);
+    setClassReport({ report: "Erreur lors de la génération du rapport", success: false });
+  } finally {
+    setGeneratingReport(false);
+  }
+};
 
   const handleGenerateStudentReport = async (studentId) => {
     setGeneratingReport(true);
