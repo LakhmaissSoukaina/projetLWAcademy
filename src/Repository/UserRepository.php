@@ -33,6 +33,73 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
+    /**
+     * Trouve les utilisateurs par rôle
+     */
+    public function findByRole(string $role): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->where('u.roles LIKE :role')
+            ->setParameter('role', '%' . $role . '%');
+        
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Compte les utilisateurs par rôle
+     */
+    public function countByRole(string $role): int
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.roles LIKE :role')
+            ->setParameter('role', '%' . $role . '%');
+        
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Trouve les étudiants d'un professeur spécifique
+     */
+    public function findStudentsByProfessor(User $professor): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->innerJoin('u.studentSessions', 's')
+            ->innerJoin('s.course', 'c')
+            ->where('c.professor = :professor')
+            ->setParameter('professor', $professor)
+            ->distinct();
+        
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Trouve les étudiants avec progression faible
+     */
+    public function findStrugglingStudents(float $threshold = 50): array
+    {
+        $allStudents = $this->findByRole('ROLE_ETUDIANT');
+        
+        return array_filter($allStudents, function($student) use ($threshold) {
+            return $student->getOverallProgress() < $threshold;
+        });
+    }
+
+    /**
+     * Trouve les étudiants par cours
+     */
+    public function findStudentsByCourse(int $courseId): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->innerJoin('u.studentSessions', 's')
+            ->innerJoin('s.course', 'c')
+            ->where('c.id = :courseId')
+            ->setParameter('courseId', $courseId)
+            ->distinct();
+        
+        return $qb->getQuery()->getResult();
+    }
+
     //    /**
     //     * @return User[] Returns an array of User objects
     //     */

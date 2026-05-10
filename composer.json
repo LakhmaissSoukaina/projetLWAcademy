@@ -12,6 +12,7 @@
         "doctrine/doctrine-bundle": "^2.18",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "google/apiclient": "^1.1",
         "lexik/jwt-authentication-bundle": "^3.2",
         "nelmio/cors-bundle": "^2.6",
         "phpdocumentor/reflection-docblock": "5.2",
@@ -40,7 +41,8 @@
             "symfony/flex": true,
             "symfony/runtime": true
         },
-        "sort-packages": true
+        "sort-packages": true,
+        "process-timeout": 1200
     },
     "autoload": {
         "psr-4": {

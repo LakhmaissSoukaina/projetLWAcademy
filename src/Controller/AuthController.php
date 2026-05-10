@@ -9,6 +9,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Google\Client as GoogleClient;
 
 class AuthController extends AbstractController
 {
@@ -61,5 +63,62 @@ class AuthController extends AbstractController
         return $this->json([
             'message' => 'Utilisateur créé avec succès'
         ]);
+    }
+
+    // ============ AJOUTER LA MÉTHODE GOOGLE LOGIN ICI ============
+    #[Route('/api/login/google', name: 'api_login_google', methods: ['POST'])]
+    public function googleLogin(
+        Request $request,
+        EntityManagerInterface $em,
+        JWTTokenManagerInterface $jwtManager
+    ): JsonResponse {
+        $data = json_decode($request->getContent(), true);
+        $credential = $data['credential'] ?? null;
+
+        if (!$credential) {
+            return $this->json(['error' => 'No credential provided'], 400);
+        }
+
+        try {
+            // Vérifier le token Google
+            $client = new GoogleClient();
+            $client->setClientId($_ENV['GOOGLE_CLIENT_ID']);
+            $payload = $client->verifyIdToken($credential);
+
+            if (!$payload) {
+                return $this->json(['error' => 'Invalid Google token'], 400);
+            }
+
+            $email = $payload['email'];
+            $name = $payload['name'] ?? '';
+            $googleId = $payload['sub'];
+
+            // Chercher ou créer l'utilisateur
+            $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+
+            if (!$user) {
+                $user = new User();
+                $user->setEmail($email);
+                $user->setRoles(['ROLE_ETUDIANT']);
+                $user->setIsVerified(true);
+                $user->setCreatedAt(new \DateTimeImmutable());
+
+                // Séparer le prénom et nom
+                $nameParts = explode(' ', $name, 2);
+                $user->setPrenom($nameParts[0] ?? '');
+                $user->setNom($nameParts[1] ?? '');
+
+                $em->persist($user);
+                $em->flush();
+            }
+
+            // Générer le token JWT
+            $token = $jwtManager->create($user);
+
+            return $this->json(['token' => $token]);
+
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Authentication failed: ' . $e->getMessage()], 400);
+        }
     }
 }
