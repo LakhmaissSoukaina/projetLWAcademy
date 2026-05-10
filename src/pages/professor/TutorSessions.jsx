@@ -11,6 +11,17 @@ export default function TutorSessions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
+  // 🔍 Recherche globale (depuis la ProfessorNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchSessions();
   }, []);
@@ -19,7 +30,6 @@ export default function TutorSessions() {
     try {
       setLoading(true);
       const data = await getTutorSessions();
-      // L'API retourne un tableau de sessions
       setSessions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading sessions:", error);
@@ -71,14 +81,19 @@ export default function TutorSessions() {
     });
   };
 
+  // 🔍 Filtrage combiné : recherche locale + recherche globale + filtre statut
   const filteredSessions = sessions.filter(session => {
-    const matchesSearch = session.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          session.student?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocalSearch = session.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                               session.student?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGlobalSearch = !globalSearchTerm.trim() ||
+                                session.title?.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
+                                session.student?.name?.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
+                                session.course?.toLowerCase().includes(globalSearchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || session.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    return matchesLocalSearch && matchesGlobalSearch && matchesStatus;
   });
 
-  // Stats
+  // Stats (basées sur toutes les sessions, non filtrées)
   const totalSessions = sessions.length;
   const scheduledSessions = sessions.filter(s => s.status === 'scheduled').length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
@@ -96,7 +111,7 @@ export default function TutorSessions() {
     <div className="w-full max-w-full">
       <main className="max-w-7xl mx-auto px-6 py-12">
         
-        {/* Header */}
+        {/* Header avec badge de recherche globale */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
           <div>
             <nav className="flex items-center gap-2 text-xs text-gray-400 mb-2">
@@ -108,6 +123,18 @@ export default function TutorSessions() {
             <p className="text-base text-gray-500 max-w-2xl mt-4">
               Gérez vos sessions de tutorat avec les étudiants.
             </p>
+            {globalSearchTerm && (
+              <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span className="material-symbols-outlined text-sm">search</span>
+                Global: <strong>{globalSearchTerm}</strong>
+                <button
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
           </div>
           <button className="bg-blue-900 text-white px-5 py-2.5 rounded-full font-semibold text-sm shadow-lg hover:bg-blue-800 transition-all flex items-center gap-2">
             <span className="material-symbols-outlined text-sm">add</span>
@@ -166,7 +193,7 @@ export default function TutorSessions() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filtres (recherche locale + statut) */}
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-8">
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex-1 min-w-[280px] relative">
@@ -203,7 +230,7 @@ export default function TutorSessions() {
           </div>
         </div>
 
-        {/* Sessions Table */}
+        {/* Tableau des sessions (filtré) */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -219,73 +246,75 @@ export default function TutorSessions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredSessions.map((session) => (
-                  <tr key={session.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">{session.title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(session.date)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-bold text-xs">
-                          {session.student?.name?.charAt(0) || '?'}
+                {filteredSessions.length > 0 ? (
+                  filteredSessions.map((session) => (
+                    <tr key={session.id} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-900">{session.title}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{formatDate(session.date)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-bold text-xs">
+                            {session.student?.name?.charAt(0) || '?'}
+                          </div>
+                          <span className="text-sm font-medium">{session.student?.name}</span>
                         </div>
-                        <span className="text-sm font-medium">{session.student?.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                        {session.course}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">{session.duration} min</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(session.status)}`}>
-                        {getStatusText(session.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        {session.status === 'scheduled' && (
-                          <button 
-                            onClick={() => updateSessionStatus(session.id, 'ongoing')}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                            title="Démarrer"
-                          >
-                            <span className="material-symbols-outlined text-sm">play_arrow</span>
-                          </button>
-                        )}
-                        {session.status === 'ongoing' && (
-                          <button 
-                            onClick={() => updateSessionStatus(session.id, 'completed')}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Terminer"
-                          >
-                            <span className="material-symbols-outlined text-sm">check</span>
-                          </button>
-                        )}
-                        {session.meetingLink && (
-                          <a 
-                            href={session.meetingLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
-                            title="Rejoindre"
-                          >
-                            <span className="material-symbols-outlined text-sm">videocam</span>
-                          </a>
-                        )}
-                      </div>
+                       </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                          {session.course}
+                        </span>
+                       </td>
+                      <td className="px-6 py-4 text-sm">{session.duration} min</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(session.status)}`}>
+                          {getStatusText(session.status)}
+                        </span>
+                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          {session.status === 'scheduled' && (
+                            <button 
+                              onClick={() => updateSessionStatus(session.id, 'ongoing')}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                              title="Démarrer"
+                            >
+                              <span className="material-symbols-outlined text-sm">play_arrow</span>
+                            </button>
+                          )}
+                          {session.status === 'ongoing' && (
+                            <button 
+                              onClick={() => updateSessionStatus(session.id, 'completed')}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Terminer"
+                            >
+                              <span className="material-symbols-outlined text-sm">check</span>
+                            </button>
+                          )}
+                          {session.meetingLink && (
+                            <a 
+                              href={session.meetingLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
+                              title="Rejoindre"
+                            >
+                              <span className="material-symbols-outlined text-sm">videocam</span>
+                            </a>
+                          )}
+                        </div>
+                       </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="text-center py-12 text-gray-500">
+                      Aucune session trouvée
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredSessions.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              Aucune session trouvée
-            </div>
-          )}
         </div>
       </main>
     </div>

@@ -16,94 +16,100 @@ export default function StudentTutors() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // 🔍 Recherche globale (depuis la StudentNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchTutors();
   }, []);
 
   const fetchTutors = async () => {
-  try {
-    setLoading(true);
-    const data = await getAvailableTutors();
-    
-    // Vérifie que data est un objet
-    if (data && typeof data === 'object') {
-      setTutorsByChapter(data);
-    } else {
-      // Si ce n'est pas un objet, utilise les données mockées
-      console.warn("Données API invalides, utilisation des mock data");
+    try {
+      setLoading(true);
+      const data = await getAvailableTutors();
+      if (data && typeof data === 'object') {
+        setTutorsByChapter(data);
+      } else {
+        console.warn("Données API invalides, utilisation des mock data");
+        setTutorsByChapter(getMockData());
+      }
+    } catch (error) {
+      console.error("Error loading tutors:", error);
       setTutorsByChapter(getMockData());
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error loading tutors:", error);
-    // Données mockées
-    setTutorsByChapter(getMockData());
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-// Fonction pour les données mockées
-const getMockData = () => ({
-  "Chapter 04: Quantum Mechanics": [
-    {
-      id: 1,
-      name: "Dr. Julian Vane",
-      role: "Senior Fellow, Physics",
-      rating: 4.9,
-      price: 120,
-      description: "Specializing in the mathematical foundations of non-linear dynamics and quantum field theory.",
-      skills: ["Theoretical Physics", "Calculus"],
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e",
-      available: true
-    },
-    {
-      id: 2,
-      name: "Prof. Elena Moretti",
-      role: "Director of Research",
-      rating: 5.0,
-      price: 145,
-      description: "Focused on interactive learning models and multi-dimensional analysis within Chapter 04.",
-      skills: ["Quantum Dynamics", "Linear Algebra"],
-      image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2",
-      available: true
-    }
-  ],
-  "Chapter 08: Comparative Linguistics": [
-    {
-      id: 3,
-      name: "Sarah Jenkins",
-      role: "Language Specialist",
-      rating: 4.8,
-      description: "Master of Arts in Comparative Literature, Sorbonne.",
-      skills: ["French", "Arabic"],
-      image: "https://images.unsplash.com/photo-1580489944761-15a19d654956",
-      price: 95,
-      available: true
-    },
-    {
-      id: 4,
-      name: "Marc Dubois",
-      role: "Linguistics Expert",
-      rating: 4.9,
-      description: "PhD in Phonetics. Specialist in Semitic and Romance language evolution.",
-      skills: ["Phonology", "Linguistics"],
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
-      price: 110,
-      available: true
-    },
-    {
-      id: 5,
-      name: "Leila Mansour",
-      role: "Senior Lecturer",
-      rating: 5.0,
-      description: "Expert in Arabic dialectology and classical French poetry.",
-      skills: ["Poetry", "Dialects", "Arabic Literature"],
-      image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce",
-      price: 130,
-      available: true
-    }
-  ]
-});
+  const getMockData = () => ({
+    "Chapter 04: Quantum Mechanics": [
+      {
+        id: 1,
+        name: "Dr. Julian Vane",
+        role: "Senior Fellow, Physics",
+        rating: 4.9,
+        price: 120,
+        description: "Specializing in the mathematical foundations of non-linear dynamics and quantum field theory.",
+        skills: ["Theoretical Physics", "Calculus"],
+        image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e",
+        available: true
+      },
+      {
+        id: 2,
+        name: "Prof. Elena Moretti",
+        role: "Director of Research",
+        rating: 5.0,
+        price: 145,
+        description: "Focused on interactive learning models and multi-dimensional analysis within Chapter 04.",
+        skills: ["Quantum Dynamics", "Linear Algebra"],
+        image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2",
+        available: true
+      }
+    ],
+    "Chapter 08: Comparative Linguistics": [
+      {
+        id: 3,
+        name: "Sarah Jenkins",
+        role: "Language Specialist",
+        rating: 4.8,
+        description: "Master of Arts in Comparative Literature, Sorbonne.",
+        skills: ["French", "Arabic"],
+        image: "https://images.unsplash.com/photo-1580489944761-15a19d654956",
+        price: 95,
+        available: true
+      },
+      {
+        id: 4,
+        name: "Marc Dubois",
+        role: "Linguistics Expert",
+        rating: 4.9,
+        description: "PhD in Phonetics. Specialist in Semitic and Romance language evolution.",
+        skills: ["Phonology", "Linguistics"],
+        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
+        price: 110,
+        available: true
+      },
+      {
+        id: 5,
+        name: "Leila Mansour",
+        role: "Senior Lecturer",
+        rating: 5.0,
+        description: "Expert in Arabic dialectology and classical French poetry.",
+        skills: ["Poetry", "Dialects", "Arabic Literature"],
+        image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce",
+        price: 130,
+        available: true
+      }
+    ]
+  });
 
   const handleBookNow = (tutor) => {
     setSelectedTutor(tutor);
@@ -120,7 +126,6 @@ const getMockData = () => ({
       alert("Veuillez sélectionner une date et une heure");
       return;
     }
-
     setSubmitting(true);
     try {
       await requestTutorSession(selectedTutor.id, {
@@ -139,21 +144,31 @@ const getMockData = () => ({
     }
   };
 
-  const renderStars = (rating) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
+  // 🔍 Fonction de correspondance tuteur (recherche avancée)
+  const tutorMatchesSearch = (tutor, term) => {
+    if (!term) return true;
+    const lowerTerm = term.toLowerCase();
     return (
-      <div className="flex items-center">
-        {[...Array(fullStars)].map((_, i) => (
-          <span key={i} className="text-yellow-500">★</span>
-        ))}
-        {hasHalfStar && <span className="text-yellow-500">½</span>}
-        {[...Array(5 - Math.ceil(rating))].map((_, i) => (
-          <span key={i} className="text-gray-300">★</span>
-        ))}
-      </div>
+      tutor.name.toLowerCase().includes(lowerTerm) ||
+      (tutor.role && tutor.role.toLowerCase().includes(lowerTerm)) ||
+      (tutor.description && tutor.description.toLowerCase().includes(lowerTerm)) ||
+      (tutor.skills && tutor.skills.some(skill => skill.toLowerCase().includes(lowerTerm))) ||
+      tutor.price?.toString().includes(lowerTerm)
     );
   };
+
+  // Filtrer les chapitres : on ne garde que ceux qui ont au moins un tuteur correspondant
+  const filteredChapters = Object.entries(tutorsByChapter).reduce((acc, [chapterName, tutors]) => {
+    const filteredTutors = tutors.filter(tutor => tutorMatchesSearch(tutor, globalSearchTerm));
+    if (filteredTutors.length > 0) {
+      acc[chapterName] = filteredTutors;
+    }
+    return acc;
+  }, {});
+
+  const hasSearch = globalSearchTerm.trim() !== "";
+  const chapterEntries = Object.entries(filteredChapters);
+  const noResults = chapterEntries.length === 0 && hasSearch;
 
   if (loading) {
     return (
@@ -162,8 +177,6 @@ const getMockData = () => ({
       </div>
     );
   }
-
-  const chapterEntries = Object.entries(tutorsByChapter);
 
   return (
     <div className="min-h-screen bg-[#f5f7ff] p-8">
@@ -178,9 +191,21 @@ const getMockData = () => ({
         <p className="max-w-3xl text-lg text-gray-600 leading-relaxed">
           Connect with distinguished faculty and subject matter experts specialized in our core chapters.
         </p>
+        {hasSearch && (
+          <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+            <span className="material-symbols-outlined text-sm">search</span>
+            Showing tutors matching: <strong>{globalSearchTerm}</strong>
+            <button
+              onClick={() => setGlobalSearchTerm("")}
+              className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        )}
       </section>
 
-      {/* TUTORS BY CHAPTER */}
+      {/* TUTORS BY CHAPTER (filtrés) */}
       {chapterEntries.map(([chapterName, tutors]) => (
         <section key={chapterName} className="mb-20">
           <div className="flex items-center justify-between mb-10">
@@ -198,7 +223,7 @@ const getMockData = () => ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {Array.isArray(tutors) && tutors.map((tutor, index) => (
+            {tutors.map((tutor) => (
               <div
                 key={tutor.id}
                 className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition duration-300"
@@ -257,7 +282,7 @@ const getMockData = () => ({
               </div>
             ))}
 
-            {/* Feature Card */}
+            {/* Feature Card (affichée seulement si le chapitre "Quantum Mechanics" est présent) */}
             {chapterName === "Chapter 04: Quantum Mechanics" && (
               <div className="bg-blue-700 rounded-3xl p-10 text-white flex flex-col justify-center">
                 <div className="text-5xl mb-6">✨</div>
@@ -276,7 +301,21 @@ const getMockData = () => ({
         </section>
       ))}
 
-      {/* BOOKING MODAL */}
+      {/* Message si aucun résultat */}
+      {noResults && (
+        <div className="text-center py-16">
+          <span className="material-symbols-outlined text-6xl text-gray-300">search_off</span>
+          <p className="text-gray-500 mt-4">No tutors match your search criteria.</p>
+          <button
+            onClick={() => setGlobalSearchTerm("")}
+            className="mt-4 text-blue-700 font-semibold hover:underline"
+          >
+            Clear search
+          </button>
+        </div>
+      )}
+
+      {/* BOOKING MODAL (inchangé) */}
       {showBookingModal && selectedTutor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div

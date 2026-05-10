@@ -22,6 +22,17 @@ export default function ProfessorStudents() {
     newThisWeek: 0
   });
 
+  // 🔍 Recherche globale (depuis la ProfessorNavbar)
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handleSearch = (event) => {
+      setGlobalSearchTerm(event.detail);
+    };
+    window.addEventListener("searchTermChange", handleSearch);
+    return () => window.removeEventListener("searchTermChange", handleSearch);
+  }, []);
+
   useEffect(() => {
     fetchStudents();
   }, []);
@@ -161,16 +172,20 @@ export default function ProfessorStudents() {
     setShowCodeModal(true);
   };
 
+  // 🔍 Filtrage combiné : recherche locale + recherche globale + autres filtres
   const filteredStudents = students.filter((student) => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          student.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLocalSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                               student.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesGlobalSearch = !globalSearchTerm.trim() ||
+                                student.name.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
+                                student.email.toLowerCase().includes(globalSearchTerm.toLowerCase());
     const matchesSubject = subjectFilter === "all" ||
                           student.subjects?.some(s => s.toLowerCase().includes(subjectFilter.toLowerCase()));
     const matchesStatus = statusFilter === "all" || student.status === statusFilter;
     const matchesPerformance = performanceFilter === "all" ||
                           (performanceFilter === "top" && student.average >= 16) ||
                           (performanceFilter === "risk" && student.average < 10);
-    return matchesSearch && matchesSubject && matchesStatus && matchesPerformance;
+    return matchesLocalSearch && matchesGlobalSearch && matchesSubject && matchesStatus && matchesPerformance;
   });
 
   if (loading) {
@@ -190,15 +205,32 @@ export default function ProfessorStudents() {
             <span className="material-symbols-outlined text-sm">school</span>
             <span className="text-xs font-semibold tracking-[0.2em] uppercase">Student Management</span>
           </div>
-          <h1 className="text-5xl xl:text-6xl font-bold text-blue-900 font-serif leading-[1.1]">
-            Gestion des Étudiants
-          </h1>
-          <p className="text-lg text-gray-500 mt-4 max-w-3xl">
-            Suivez les progrès, identifiez les talents et gérez vos tuteurs au sein de l'académie.
-          </p>
+          <div className="flex justify-between items-start flex-wrap gap-4">
+            <div>
+              <h1 className="text-5xl xl:text-6xl font-bold text-blue-900 font-serif leading-[1.1]">
+                Gestion des Étudiants
+              </h1>
+              <p className="text-lg text-gray-500 mt-4 max-w-3xl">
+                Suivez les progrès, identifiez les talents et gérez vos tuteurs au sein de l'académie.
+              </p>
+            </div>
+            {/* Badge de recherche globale */}
+            {globalSearchTerm && (
+              <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <span className="material-symbols-outlined text-sm">search</span>
+                Global: <strong>{globalSearchTerm}</strong>
+                <button
+                  onClick={() => setGlobalSearchTerm("")}
+                  className="ml-1 hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* SEARCH */}
+        {/* SEARCH (locale) */}
         <div className="mb-8">
           <div className="relative max-w-xl">
             <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
@@ -287,7 +319,11 @@ export default function ProfessorStudents() {
                   <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-4">
-                        <img src={student.avatar} alt={student.name} className="w-11 h-11 rounded-full object-cover" />
+                        <img
+                          src={student.avatar}
+                          alt={student.name}
+                          className="w-11 h-11 rounded-full object-cover"
+                        />
                         <div>
                           <h4 className="font-semibold text-gray-900 text-sm">{student.name}</h4>
                           <p className="text-xs text-gray-400">{student.email}</p>
@@ -297,7 +333,10 @@ export default function ProfessorStudents() {
                     <td className="px-6 py-5">
                       <div className="flex flex-wrap gap-1.5">
                         {student.subjects?.map((subject, i) => (
-                          <span key={i} className="bg-blue-50 text-blue-700 text-[11px] px-2.5 py-1 rounded-md font-semibold">
+                          <span
+                            key={i}
+                            className="bg-blue-50 text-blue-700 text-[11px] px-2.5 py-1 rounded-md font-semibold"
+                          >
                             {subject}
                           </span>
                         ))}
@@ -309,7 +348,12 @@ export default function ProfessorStudents() {
                           <span className="font-semibold text-gray-700">{student.progress}%</span>
                         </div>
                         <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 ${student.progress >= 60 ? "bg-blue-700" : student.progress >= 40 ? "bg-orange-400" : "bg-red-500"}`} style={{ width: `${student.progress}%` }} />
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              student.progress >= 60 ? "bg-blue-700" : student.progress >= 40 ? "bg-orange-400" : "bg-red-500"
+                            }`}
+                            style={{ width: `${student.progress}%` }}
+                          />
                         </div>
                       </div>
                     </td>
@@ -317,24 +361,46 @@ export default function ProfessorStudents() {
                       {student.quizSubmitted}/{student.quizTotal}
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <span className={`px-3 py-1.5 rounded-xl font-semibold text-sm ${student.average >= 14 ? "bg-green-50 text-green-700" : student.average >= 10 ? "bg-orange-50 text-orange-600" : "bg-red-50 text-red-600"}`}>
+                      <span
+                        className={`px-3 py-1.5 rounded-xl font-semibold text-sm ${
+                          student.average >= 14
+                            ? "bg-green-50 text-green-700"
+                            : student.average >= 10
+                            ? "bg-orange-50 text-orange-600"
+                            : "bg-red-50 text-red-600"
+                        }`}
+                      >
                         {student.average?.toFixed(1)}/20
                       </span>
                     </td>
                     <td className="px-6 py-5">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${student.status === "tutor" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-700"}`}>
-                        {student.status === "tutor" && <span className="material-symbols-outlined text-[14px]">stars</span>}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                          student.status === "tutor"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-blue-50 text-blue-700"
+                        }`}
+                      >
+                        {student.status === "tutor" && (
+                          <span className="material-symbols-outlined text-[14px]">stars</span>
+                        )}
                         {student.status === "tutor" ? "Tuteur" : "Étudiant"}
                       </span>
                     </td>
                     <td className="px-6 py-5 text-xs text-gray-400 italic">{student.lastActivity}</td>
                     <td className="px-6 py-5 text-center">
-                      <button onClick={() => openStudentModal(student)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-xl transition-all">
+                      <button
+                        onClick={() => openStudentModal(student)}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-xl transition-all"
+                      >
                         <span className="material-symbols-outlined text-[20px]">visibility</span>
                       </button>
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <button onClick={() => openCodeModal(student)} className="bg-green-50 hover:bg-green-100 text-green-700 p-3 rounded-xl transition-all">
+                      <button
+                        onClick={() => openCodeModal(student)}
+                        className="bg-green-50 hover:bg-green-100 text-green-700 p-3 rounded-xl transition-all"
+                      >
                         <span className="material-symbols-outlined text-[20px]">vpn_key</span>
                       </button>
                     </td>
@@ -365,32 +431,54 @@ export default function ProfessorStudents() {
           <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-3xl font-bold text-blue-900">Informations Étudiant</h2>
-              <button onClick={() => setShowStudentModal(false)} className="text-gray-400 hover:text-red-500">
+              <button
+                onClick={() => setShowStudentModal(false)}
+                className="text-gray-400 hover:text-red-500"
+              >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             <div className="p-8">
               <div className="flex items-center gap-6 mb-8">
-                <img src={selectedStudent.avatar} alt={selectedStudent.name} className="w-28 h-28 rounded-full object-cover border-4 border-blue-100" />
+                <img
+                  src={selectedStudent.avatar}
+                  alt={selectedStudent.name}
+                  className="w-28 h-28 rounded-full object-cover border-4 border-blue-100"
+                />
                 <div>
                   <h3 className="text-3xl font-bold text-gray-900">{selectedStudent.name}</h3>
                   <p className="text-gray-500 mt-1">{selectedStudent.email}</p>
-                  <div className="mt-3">{/* Status badge */}</div>
+                  <div className="mt-3">{/* Status badge optionnel */}</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="bg-gray-50 rounded-2xl p-5">
                   <h4 className="text-sm text-gray-500 mb-2">Moyenne</h4>
-                  <span className="px-3 py-1.5 rounded-xl font-semibold text-sm bg-green-50 text-green-700">{selectedStudent.average?.toFixed(1)}/20</span>
+                  <span
+                    className={`px-3 py-1.5 rounded-xl font-semibold text-sm ${
+                      selectedStudent.average >= 14
+                        ? "bg-green-50 text-green-700"
+                        : selectedStudent.average >= 10
+                        ? "bg-orange-50 text-orange-600"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    {selectedStudent.average?.toFixed(1)}/20
+                  </span>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-5">
                   <h4 className="text-sm text-gray-500 mb-2">Quiz Complétés</h4>
-                  <p className="font-bold text-2xl text-blue-900">{selectedStudent.quizSubmitted}/{selectedStudent.quizTotal}</p>
+                  <p className="font-bold text-2xl text-blue-900">
+                    {selectedStudent.quizSubmitted}/{selectedStudent.quizTotal}
+                  </p>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-5">
                   <h4 className="text-sm text-gray-500 mb-3">Progression</h4>
                   <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="bg-blue-700 h-full rounded-full" style={{ width: `${selectedStudent.progress}%` }} />
+                    <div
+                      className="bg-blue-700 h-full rounded-full"
+                      style={{ width: `${selectedStudent.progress}%` }}
+                    />
                   </div>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-5">
@@ -412,27 +500,49 @@ export default function ProfessorStudents() {
                 <h3 className="text-3xl font-bold text-blue-900">Nouveau Code d'Accès</h3>
                 <p className="text-gray-500 mt-2">{selectedStudent.name}</p>
               </div>
-              <button onClick={() => setShowCodeModal(false)} className="text-gray-400 hover:text-red-500">
+              <button
+                onClick={() => setShowCodeModal(false)}
+                className="text-gray-400 hover:text-red-500"
+              >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             <div className="p-8 space-y-6">
               <div className="bg-blue-50 rounded-2xl border border-blue-100 p-6">
                 <div className="bg-white rounded-xl p-5 border border-blue-100 flex justify-between items-center">
-                  <span className="font-mono text-2xl font-bold text-blue-900 tracking-widest">{generatedCode}</span>
-                  <button onClick={() => navigator.clipboard.writeText(generatedCode)} className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-3 rounded-xl transition-all">
+                  <span className="font-mono text-2xl font-bold text-blue-900 tracking-widest">
+                    {generatedCode}
+                  </span>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(generatedCode)}
+                    className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-3 rounded-xl transition-all"
+                  >
                     <span className="material-symbols-outlined">content_copy</span>
                   </button>
                 </div>
               </div>
             </div>
             <div className="p-8 bg-gray-50 flex flex-wrap gap-4 justify-end">
-              <button onClick={() => setGeneratedCode(generateAccessCode())} className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center gap-2">
+              <button
+                onClick={() => setGeneratedCode(generateAccessCode())}
+                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center gap-2"
+              >
                 <span className="material-symbols-outlined text-[20px]">refresh</span>
                 Régénérer
               </button>
-              <button onClick={() => setShowCodeModal(false)} className="px-8 py-3 text-gray-600 font-semibold hover:text-blue-900 transition-colors">Annuler</button>
-              <button onClick={() => { alert(`Code généré pour ${selectedStudent.name} : ${generatedCode}`); setShowCodeModal(false); }} className="px-10 py-3 bg-blue-800 text-white font-semibold rounded-xl shadow-lg hover:brightness-110 transition-all flex items-center gap-2">
+              <button
+                onClick={() => setShowCodeModal(false)}
+                className="px-8 py-3 text-gray-600 font-semibold hover:text-blue-900 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  alert(`Code généré pour ${selectedStudent.name} : ${generatedCode}`);
+                  setShowCodeModal(false);
+                }}
+                className="px-10 py-3 bg-blue-800 text-white font-semibold rounded-xl shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+              >
                 <span className="material-symbols-outlined text-[20px]">check_circle</span>
                 Valider
               </button>

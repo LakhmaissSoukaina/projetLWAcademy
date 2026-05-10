@@ -12,6 +12,11 @@ export const updateUserRoles = async (userId, roles) => {
   return response.data;
 };
 
+export const createUser = async (userData) => {
+  const response = await api.post("/admin/users", userData);
+  return response.data;
+};
+
 // ============ COURSES ============
 export const getCourses = async () => {
   const response = await api.get("/admin/courses");
@@ -54,6 +59,7 @@ export const getAdminStats = async () => {
   const response = await api.get("/admin/stats");
   return response.data;
 };
+
 // ============ AI REPORTS (ADMIN) ============
 export const getAIReports = async () => {
   const response = await api.get("/admin/ai/reports");
