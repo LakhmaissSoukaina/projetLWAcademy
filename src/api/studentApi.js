@@ -89,3 +89,20 @@ export const getReportDetails = async (reportId) => {
   const response = await api.get(`/student/reports/${reportId}`);
   return response.data;
 };
+// frontend/src/api/studentApi.js - Ajoute à la fin du fichier
+
+// ============ IA ASSISTANT ============
+export const generateMyReport = async () => {
+  const response = await api.get("/ai/student/my-report");
+  return response.data;
+};
+
+export const generateStudyPlanAI = async () => {
+  const response = await api.post("/ai/student/study-plan-ai");
+  return response.data;
+};
+
+export const getAISuggestions = async () => {
+  const response = await api.get("/ai/suggestions");
+  return response.data;
+};

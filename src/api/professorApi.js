@@ -112,3 +112,19 @@ export const generateAIReport = async (data) => {
   const response = await api.post("/professor/ai-reports/generate", data);
   return response.data;
 };
+
+// ============ FONCTIONS IA ============
+export const generateClassReport = async () => {
+  const response = await api.post("/ai/professor/class-report");
+  return response.data;
+};
+
+export const generateIndividualStudentReport = async (studentId) => {
+  const response = await api.post(`/ai/professor/student-report/${studentId}`);
+  return response.data;
+};
+
+export const getAISuggestions = async () => {
+  const response = await api.get("/ai/suggestions");
+  return response.data;
+};

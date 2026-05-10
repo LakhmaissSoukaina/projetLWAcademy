@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { getStudentReports, getReportDetails } from "../../api/studentApi";
+import { generateMyReport, generateStudyPlanAI, getAISuggestions } from "../../api/studentApi";
 import { useParams, useNavigate } from "react-router-dom";
 
 export default function StudentReport() {
@@ -11,9 +12,20 @@ export default function StudentReport() {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState(null);
   const [questions, setQuestions] = useState([]);
+  
+  // États pour l'IA
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [currentAiReport, setCurrentAiReport] = useState(null);
+  const [currentAiPlan, setCurrentAiPlan] = useState(null);
+  const [showAiReportModal, setShowAiReportModal] = useState(false);
+  const [showAiPlanModal, setShowAiPlanModal] = useState(false);
+  const [previousReports, setPreviousReports] = useState([]);
+  const [previousPlans, setPreviousPlans] = useState([]);
 
   useEffect(() => {
     fetchReport();
+    fetchAIData();
   }, [reportId]);
 
   const fetchReport = async () => {
@@ -57,6 +69,48 @@ export default function StudentReport() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAIData = async () => {
+    try {
+      const suggestions = await getAISuggestions();
+      const reports = suggestions.filter(s => s.type === 'student_self_report');
+      const plans = suggestions.filter(s => s.type === 'study_plan_ai');
+      setPreviousReports(reports.slice(0, 3));
+      setPreviousPlans(plans.slice(0, 3));
+    } catch (error) {
+      console.error("Error fetching AI data:", error);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    setGeneratingReport(true);
+    setShowAiReportModal(true);
+    try {
+      const result = await generateMyReport();
+      setCurrentAiReport(result);
+      await fetchAIData();
+    } catch (error) {
+      console.error("Error generating report:", error);
+      setCurrentAiReport({ report: "Erreur lors de la génération du rapport", success: false });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  const handleGenerateStudyPlan = async () => {
+    setGeneratingPlan(true);
+    setShowAiPlanModal(true);
+    try {
+      const result = await generateStudyPlanAI();
+      setCurrentAiPlan(result);
+      await fetchAIData();
+    } catch (error) {
+      console.error("Error generating study plan:", error);
+      setCurrentAiPlan({ study_plan: "Erreur lors de la génération du plan", success: false });
+    } finally {
+      setGeneratingPlan(false);
     }
   };
 
@@ -107,13 +161,33 @@ export default function StudentReport() {
     <div className="min-h-screen bg-[#f9f9ff] text-[#141b2b]">
       <main className="max-w-[1440px] mx-auto px-6 py-8">
         {/* BREADCRUMB */}
-        <nav className="flex items-center gap-2 mb-10 text-sm text-gray-500">
+        <nav className="flex items-center gap-2 mb-6 text-sm text-gray-500">
           <span>Dashboard</span>
           <span>›</span>
           <span>Courses</span>
           <span>›</span>
           <span className="text-blue-800 font-semibold">Quiz Result</span>
         </nav>
+
+        {/* BOUTONS IA EN HAUT */}
+        <div className="flex justify-end gap-3 mb-6">
+          <button 
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined">psychology</span>
+            {generatingReport ? "Génération..." : "Mon Rapport Complet IA"}
+          </button>
+          <button 
+            onClick={handleGenerateStudyPlan}
+            disabled={generatingPlan}
+            className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined">menu_book</span>
+            {generatingPlan ? "Génération..." : "Plan d'étude IA"}
+          </button>
+        </div>
 
         {/* HERO SECTION */}
         <section className="grid grid-cols-12 gap-8 mb-14">
@@ -265,6 +339,47 @@ export default function StudentReport() {
           </div>
         </section>
 
+        {/* HISTORIQUE DES RAPPORTS IA */}
+        {(previousReports.length > 0 || previousPlans.length > 0) && (
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-blue-900 mb-6">📋 Historique IA</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {previousReports.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <h3 className="font-bold text-purple-600 mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined">history</span>
+                    Rapports précédents
+                  </h3>
+                  <div className="space-y-3">
+                    {previousReports.map((r, i) => (
+                      <div key={i} className="p-3 bg-purple-50 rounded-xl">
+                        <p className="text-sm text-gray-700 line-clamp-2">{r.content.substring(0, 100)}...</p>
+                        <p className="text-xs text-gray-400 mt-2">{new Date(r.generatedAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {previousPlans.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <h3 className="font-bold text-green-600 mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined">history</span>
+                    Plans d'étude précédents
+                  </h3>
+                  <div className="space-y-3">
+                    {previousPlans.map((p, i) => (
+                      <div key={i} className="p-3 bg-green-50 rounded-xl">
+                        <p className="text-sm text-gray-700 line-clamp-2">{p.content.substring(0, 100)}...</p>
+                        <p className="text-xs text-gray-400 mt-2">{new Date(p.generatedAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* ACTIONS */}
         <div className="flex flex-col md:flex-row justify-center gap-6 pb-10">
           <button className="px-10 py-4 border-2 border-blue-800 text-blue-800 rounded-2xl hover:bg-blue-50 transition">
@@ -278,6 +393,99 @@ export default function StudentReport() {
           </button>
         </div>
       </main>
+
+      {/* MODAL RAPPORT IA */}
+      {showAiReportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-purple-600 flex items-center gap-2">
+                <span className="material-symbols-outlined">psychology</span>
+                Mon Rapport Personnalisé
+              </h2>
+              <button onClick={() => setShowAiReportModal(false)} className="text-gray-400 hover:text-gray-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              {generatingReport ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Génération de votre rapport personnalisé...</p>
+                </div>
+              ) : currentAiReport ? (
+                <div>
+                  <div className="bg-purple-50 rounded-xl p-4 mb-6">
+                    <p className="text-sm text-purple-600">Progression actuelle: {report.score || 0}%</p>
+                    <div className="w-full h-2 bg-purple-200 rounded-full mt-2">
+                      <div className="h-full bg-purple-600 rounded-full" style={{ width: `${report.score || 0}%` }}></div>
+                    </div>
+                  </div>
+                  <div className="prose max-w-none">
+                    <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                      {currentAiReport.report}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-6 text-right">
+                    Généré le {new Date(currentAiReport.generated_at || new Date()).toLocaleString()}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">Erreur lors de la génération du rapport</p>
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-gray-50 p-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowAiReportModal(false)} className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PLAN D'ÉTUDE IA */}
+      {showAiPlanModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-green-600 flex items-center gap-2">
+                <span className="material-symbols-outlined">menu_book</span>
+                Plan d'étude Personnalisé
+              </h2>
+              <button onClick={() => setShowAiPlanModal(false)} className="text-gray-400 hover:text-gray-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              {generatingPlan ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Génération de votre plan d'étude personnalisé...</p>
+                </div>
+              ) : currentAiPlan ? (
+                <div>
+                  <div className="bg-green-50 rounded-xl p-4 mb-6">
+                    <p className="text-sm text-green-600">Plan basé sur vos résultats actuels</p>
+                  </div>
+                  <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                    {currentAiPlan.study_plan}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-6 text-right">
+                    Généré le {new Date(currentAiPlan.generated_at || new Date()).toLocaleString()}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">Erreur lors de la génération du plan d'étude</p>
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-gray-50 p-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowAiPlanModal(false)} className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

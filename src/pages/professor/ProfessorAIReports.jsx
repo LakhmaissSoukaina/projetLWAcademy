@@ -1,11 +1,18 @@
-// src/pages/professor/ProfessorAIReports.jsx
+// src/pages/admin/AIReports.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { getProfessorAIReports, generateAIReport } from "../../api/professorApi";
+import { getAIReports, generateAIReport, getAISystemStats } from "../../api/adminApi";
+import api from "../../api/axios";
 
-export default function ProfessorAIReports() {
+export default function AIReports() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [studentReport, setStudentReport] = useState(null);
+  const [classReport, setClassReport] = useState(null);
+  const [showClassReportModal, setShowClassReportModal] = useState(false);
   const [stats, setStats] = useState({
     averageScore: 0,
     successRate: 0,
@@ -28,15 +35,17 @@ export default function ProfessorAIReports() {
   const [highPerformers, setHighPerformers] = useState([]);
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [exporting, setExporting] = useState(false);
+  const [students, setStudents] = useState([]);
 
   useEffect(() => {
     fetchAIReports();
+    fetchStudents();
   }, []);
 
   const fetchAIReports = async () => {
     try {
       setLoading(true);
-      const data = await getProfessorAIReports();
+      const data = await getAIReports();
       setStats({
         averageScore: data.averageScore || 84.2,
         successRate: data.successRate || 92,
@@ -46,24 +55,55 @@ export default function ProfessorAIReports() {
       setHeatmapData(data.heatmap || heatmapData);
       setAiInsight(data.aiInsight || aiInsight);
       setHighPerformers(data.highPerformers || [
-        { initials: "EL", name: "Elena Laurent", score: "98%" },
-        { initials: "MK", name: "Marc Khalil", score: "96%" }
+        { id: 1, initials: "EL", name: "Elena Laurent", score: "98%" },
+        { id: 2, initials: "MK", name: "Marc Khalil", score: "96%" }
       ]);
       setAtRiskStudents(data.atRiskStudents || [
-        { initials: "JB", name: "Julien Bernard", info: "58% • 4 failed topics" },
-        { initials: "SA", name: "Sarah Al-Farsi", info: "62% • Low engagement" }
+        { id: 3, initials: "JB", name: "Julien Bernard", info: "58% • 4 failed topics" },
+        { id: 4, initials: "SA", name: "Sarah Al-Farsi", info: "62% • Low engagement" }
       ]);
     } catch (error) {
       console.error("Error loading AI reports:", error);
-      // Données par défaut
-      setStats({
-        averageScore: 84.2,
-        successRate: 92,
-        avgCompletionTime: 42,
-        difficultItems: 3
-      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const response = await api.get("/admin/users");
+      const studentsList = response.data.filter(u => u.roles?.includes('ROLE_ETUDIANT'));
+      setStudents(studentsList);
+    } catch (error) {
+      console.error("Error loading students:", error);
+    }
+  };
+
+  const handleGenerateClassReport = async () => {
+    setGeneratingReport(true);
+    setShowClassReportModal(true);
+    try {
+      const result = await generateAIReport("global_report");
+      setClassReport(result);
+    } catch (error) {
+      console.error("Error generating class report:", error);
+      setClassReport({ report: "Erreur lors de la génération du rapport", success: false });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  const handleGenerateStudentReport = async (studentId) => {
+    setGeneratingReport(true);
+    setShowStudentModal(true);
+    try {
+      const result = await generateAIReport(`student_report_${studentId}`);
+      setStudentReport(result);
+    } catch (error) {
+      console.error("Error generating student report:", error);
+      setStudentReport({ report: "Erreur lors de la génération du rapport", success: false });
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -71,7 +111,6 @@ export default function ProfessorAIReports() {
     setExporting(true);
     try {
       const report = await generateAIReport({ type: "quiz_report", format: "pdf" });
-      // Créer un blob pour le téléchargement
       const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -109,7 +148,7 @@ export default function ProfessorAIReports() {
     <div className="w-full bg-[#f9f9ff] min-h-screen">
       <main className="w-full px-6 lg:px-10 py-10">
 
-        {/* HEADER */}
+        {/* HEADER avec bouton Rapport Classe IA */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
           <div>
             <div className="flex items-center gap-2 text-blue-700 mb-2">
@@ -123,14 +162,24 @@ export default function ProfessorAIReports() {
               Final Assessment: Introduction to Bilingual Semantics (Section B-24)
             </p>
           </div>
-          <button 
-            onClick={handleExport}
-            disabled={exporting}
-            className="bg-blue-900 text-white px-8 py-4 rounded-2xl font-semibold text-sm shadow-md hover:bg-blue-800 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 self-start md:self-auto disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined">download</span>
-            <span>{exporting ? "Exporting..." : "Export Reports"}</span>
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleGenerateClassReport}
+              disabled={generatingReport}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md hover:-translate-y-1 transition-all duration-300 flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined">auto_awesome</span>
+              {generatingReport ? "Génération..." : "Générer Rapport Classe IA"}
+            </button>
+            <button 
+              onClick={handleExport}
+              disabled={exporting}
+              className="bg-blue-900 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md hover:bg-blue-800 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 self-start md:self-auto disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined">download</span>
+              <span>{exporting ? "Exporting..." : "Export Reports"}</span>
+            </button>
+          </div>
         </div>
 
         {/* METRICS */}
@@ -167,7 +216,6 @@ export default function ProfessorAIReports() {
 
         {/* CHART + AI */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-          {/* HEATMAP */}
           <div className="xl:col-span-2 bg-white p-8 rounded-2xl shadow-md">
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -190,7 +238,6 @@ export default function ProfessorAIReports() {
             </div>
           </div>
 
-          {/* AI INSIGHT */}
           <div className="bg-blue-900 text-white p-8 rounded-2xl shadow-xl flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3 mb-6">
@@ -211,9 +258,8 @@ export default function ProfessorAIReports() {
           </div>
         </div>
 
-        {/* STUDENTS */}
+        {/* STUDENTS avec boutons Rapport Individuel */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* HIGH PERFORMERS */}
           <div className="bg-white rounded-2xl shadow-md overflow-hidden">
             <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -224,7 +270,7 @@ export default function ProfessorAIReports() {
             </div>
             <div className="p-5 space-y-5">
               {highPerformers.map((student) => (
-                <div key={student.name} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
+                <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
                       {student.initials}
@@ -234,13 +280,17 @@ export default function ProfessorAIReports() {
                       <p className="text-sm text-gray-500">{student.score} Correct</p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-gray-400 cursor-pointer">more_vert</span>
+                  <button 
+                    onClick={() => handleGenerateStudentReport(student.id)}
+                    className="text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition"
+                  >
+                    Rapport IA
+                  </button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* AT RISK */}
           <div className="bg-white rounded-2xl shadow-md overflow-hidden">
             <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -251,7 +301,7 @@ export default function ProfessorAIReports() {
             </div>
             <div className="p-5 space-y-5">
               {atRiskStudents.map((student) => (
-                <div key={student.name} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
+                <div key={student.id} className="flex items-center justify-between hover:bg-gray-50 p-3 rounded-xl transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center font-bold text-red-600">
                       {student.initials}
@@ -261,8 +311,11 @@ export default function ProfessorAIReports() {
                       <p className="text-sm text-gray-500">{student.info}</p>
                     </div>
                   </div>
-                  <button className="border border-red-500 text-red-500 text-xs font-bold px-4 py-2 rounded-full hover:bg-red-500 hover:text-white transition-all duration-300">
-                    Schedule
+                  <button 
+                    onClick={() => handleGenerateStudentReport(student.id)}
+                    className="border border-purple-500 text-purple-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-purple-50 transition"
+                  >
+                    Rapport IA
                   </button>
                 </div>
               ))}
@@ -270,6 +323,103 @@ export default function ProfessorAIReports() {
           </div>
         </div>
       </main>
+
+      {/* MODAL RAPPORT CLASSE */}
+      {showClassReportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-purple-600 flex items-center gap-2">
+                <span className="material-symbols-outlined">auto_awesome</span>
+                Rapport de Classe IA
+              </h2>
+              <button onClick={() => setShowClassReportModal(false)} className="text-gray-400 hover:text-gray-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              {generatingReport ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Génération du rapport de classe...</p>
+                </div>
+              ) : classReport ? (
+                <div>
+                  {classReport.statistics && (
+                    <div className="bg-purple-50 rounded-xl p-4 mb-6">
+                      <h3 className="font-bold mb-2">Statistiques de la classe</h3>
+                      <p>Total étudiants: {classReport.statistics.total_students || students.length}</p>
+                      <p>Moyenne quiz: {classReport.statistics.avg_quiz_score || stats.averageScore}%</p>
+                      <p>Progression moyenne: {classReport.statistics.avg_progress || 75}%</p>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                    {classReport.report || classReport.message || "Rapport généré avec succès"}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-6 text-right">
+                    Généré le {new Date(classReport.generated_at || new Date()).toLocaleString()}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">Erreur lors de la génération</p>
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-gray-50 p-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowClassReportModal(false)} className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RAPPORT ÉTUDIANT */}
+      {showStudentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-purple-600 flex items-center gap-2">
+                <span className="material-symbols-outlined">person</span>
+                Rapport Étudiant IA
+              </h2>
+              <button onClick={() => setShowStudentModal(false)} className="text-gray-400 hover:text-gray-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              {generatingReport ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Génération du rapport personnalisé...</p>
+                </div>
+              ) : studentReport ? (
+                <div>
+                  {studentReport.student && (
+                    <div className="bg-purple-50 rounded-xl p-4 mb-6">
+                      <h3 className="font-bold mb-2">{studentReport.student.name}</h3>
+                      <p>Moyenne quiz: {studentReport.student.quiz_average}/100</p>
+                      <p>Progression: {studentReport.student.overall_progress}%</p>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                    {studentReport.report}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-6 text-right">
+                    Généré le {new Date(studentReport.generated_at || new Date()).toLocaleString()}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">Erreur lors de la génération</p>
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-gray-50 p-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowStudentModal(false)} className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

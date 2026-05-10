@@ -54,3 +54,28 @@ export const getAdminStats = async () => {
   const response = await api.get("/admin/stats");
   return response.data;
 };
+// ============ AI REPORTS (ADMIN) ============
+export const getAIReports = async () => {
+  const response = await api.get("/admin/ai/reports");
+  return response.data;
+};
+
+export const generateAIReport = async (type) => {
+  const response = await api.post("/admin/ai/generate", { type });
+  return response.data;
+};
+
+export const getAISystemStats = async () => {
+  const response = await api.get("/admin/ai/stats");
+  return response.data;
+};
+
+export const generateClassReport = async () => {
+  const response = await api.post("/admin/ai/class-report");
+  return response.data;
+};
+
+export const generateStudentReport = async (studentId) => {
+  const response = await api.post(`/admin/ai/student-report/${studentId}`);
+  return response.data;
+};
