@@ -183,7 +183,7 @@ function Register() {
               </button>
             </form>
 
-            {/* Professor CTA */}
+            {/* Professor CTA - LIEN VERS PAGE DE CANDIDATURE */}
             <div className="mt-10 p-4 bg-[#f1f3ff] rounded-xl flex items-center gap-4">
               <div className="w-11 h-11 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                 <span className="material-symbols-outlined text-[#00288e]">clinical_notes</span>
@@ -192,7 +192,12 @@ function Register() {
                 <p className="text-sm font-bold text-gray-800">Applying as a Professor?</p>
                 <p className="text-xs text-gray-500">Validation of credentials required.</p>
               </div>
-              <button className="text-[#00288e] font-bold text-sm underline whitespace-nowrap">Register</button>
+              <Link 
+                to="/register-professor" 
+                className="text-[#00288e] font-bold text-sm underline whitespace-nowrap hover:opacity-80 transition"
+              >
+                Apply here
+              </Link>
             </div>
           </div>
 

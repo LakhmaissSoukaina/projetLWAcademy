@@ -298,7 +298,7 @@ export default function AIReports() {
               <img src={aiInsight.image} alt="AI" className="rounded-2xl h-44 w-full object-cover mb-6" />
             </div>
             <button onClick={handleApplyTeachingPlan} className="w-full bg-white text-blue-900 font-semibold py-3 rounded-xl hover:bg-blue-50 transition-all duration-300">
-              Apply Teaching Plan
+             
             </button>
           </div>
         </div>

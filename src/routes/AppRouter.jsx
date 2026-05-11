@@ -1,12 +1,13 @@
 // frontend/src/routes/AppRouter.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
-import { AuthContext } from "../context/AuthContext";  // ← Changé
+import { AuthContext } from "../context/AuthContext";
 
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
 import Home from "../pages/Home";
 import LandingPage from "../pages/LandingPage";
+import RegisterProfessor from "../pages/RegisterProfessor"; // ← AJOUT
 
 // =========================
 // ADMIN
@@ -17,6 +18,7 @@ import Users from "../pages/admin/Users";
 import Courses from "../pages/admin/Courses";
 import Tutors from "../pages/admin/Tutors";
 import AIReports from "../pages/admin/AIReports";
+import AdminProfessorRequests from "../pages/admin/AdminProfessorRequests"; // ← AJOUT
 
 // =========================
 // PROFESSOR
@@ -104,6 +106,7 @@ function AppRouter() {
       <Route path="/home" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/register-professor" element={<RegisterProfessor />} /> {/* ← AJOUT */}
       <Route path="/redirect" element={<AutoRedirect />} />
 
       {/* ADMIN ROUTES */}
@@ -120,6 +123,7 @@ function AppRouter() {
         <Route path="courses" element={<Courses />} />
         <Route path="tutors" element={<Tutors />} />
         <Route path="ai" element={<AIReports />} />
+        <Route path="professor-requests" element={<AdminProfessorRequests />} /> {/* ← AJOUT */}
       </Route>
 
       {/* PROFESSOR ROUTES */}

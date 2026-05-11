@@ -16,7 +16,6 @@ export default function StudentTutors() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // 🔍 Recherche globale (depuis la StudentNavbar)
   const [globalSearchTerm, setGlobalSearchTerm] = useState("");
 
   useEffect(() => {
@@ -32,22 +31,18 @@ export default function StudentTutors() {
   }, []);
 
   const fetchTutors = async () => {
-    try {
-      setLoading(true);
-      const data = await getAvailableTutors();
-      if (data && typeof data === 'object') {
-        setTutorsByChapter(data);
-      } else {
-        console.warn("Données API invalides, utilisation des mock data");
-        setTutorsByChapter(getMockData());
-      }
-    } catch (error) {
-      console.error("Error loading tutors:", error);
-      setTutorsByChapter(getMockData());
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    // Force l'utilisation des mock data pour tester l'affichage
+    const mockData = getMockData();
+    setTutorsByChapter(mockData);
+  } catch (error) {
+    console.error("Error loading tutors:", error);
+    setTutorsByChapter(getMockData());
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getMockData = () => ({
     "Chapter 04: Quantum Mechanics": [
@@ -123,7 +118,7 @@ export default function StudentTutors() {
 
   const handleSubmitBooking = async () => {
     if (!bookingData.date || !bookingData.time) {
-      alert("Veuillez sélectionner une date et une heure");
+      alert("Veuillez selectionner une date et une heure");
       return;
     }
     setSubmitting(true);
@@ -133,18 +128,17 @@ export default function StudentTutors() {
         time: bookingData.time,
         message: bookingData.message
       });
-      alert("Demande de session envoyée avec succès !");
+      alert("Demande de session envoyee avec succes !");
       setShowBookingModal(false);
       setBookingData({ date: "", time: "", message: "" });
     } catch (error) {
       console.error("Error booking session:", error);
-      alert("Erreur lors de la réservation");
+      alert("Erreur lors de la reservation");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // 🔍 Fonction de correspondance tuteur (recherche avancée)
   const tutorMatchesSearch = (tutor, term) => {
     if (!term) return true;
     const lowerTerm = term.toLowerCase();
@@ -157,9 +151,9 @@ export default function StudentTutors() {
     );
   };
 
-  // Filtrer les chapitres : on ne garde que ceux qui ont au moins un tuteur correspondant
   const filteredChapters = Object.entries(tutorsByChapter).reduce((acc, [chapterName, tutors]) => {
-    const filteredTutors = tutors.filter(tutor => tutorMatchesSearch(tutor, globalSearchTerm));
+    const tutorsArray = Array.isArray(tutors) ? tutors : [];
+    const filteredTutors = tutorsArray.filter(tutor => tutorMatchesSearch(tutor, globalSearchTerm));
     if (filteredTutors.length > 0) {
       acc[chapterName] = filteredTutors;
     }
@@ -180,10 +174,9 @@ export default function StudentTutors() {
 
   return (
     <div className="min-h-screen bg-[#f5f7ff] p-8">
-      {/* HERO */}
       <section className="mb-16">
         <p className="text-sm text-gray-500 mb-4">
-          Dashboard → Tutors
+          Dashboard -Tutors
         </p>
         <h1 className="text-5xl font-bold text-blue-900 mb-6">
           Academic Tutors
@@ -205,7 +198,6 @@ export default function StudentTutors() {
         )}
       </section>
 
-      {/* TUTORS BY CHAPTER (filtrés) */}
       {chapterEntries.map(([chapterName, tutors]) => (
         <section key={chapterName} className="mb-20">
           <div className="flex items-center justify-between mb-10">
@@ -282,7 +274,6 @@ export default function StudentTutors() {
               </div>
             ))}
 
-            {/* Feature Card (affichée seulement si le chapitre "Quantum Mechanics" est présent) */}
             {chapterName === "Chapter 04: Quantum Mechanics" && (
               <div className="bg-blue-700 rounded-3xl p-10 text-white flex flex-col justify-center">
                 <div className="text-5xl mb-6">✨</div>
@@ -301,7 +292,6 @@ export default function StudentTutors() {
         </section>
       ))}
 
-      {/* Message si aucun résultat */}
       {noResults && (
         <div className="text-center py-16">
           <span className="material-symbols-outlined text-6xl text-gray-300">search_off</span>
@@ -315,7 +305,6 @@ export default function StudentTutors() {
         </div>
       )}
 
-      {/* BOOKING MODAL (inchangé) */}
       {showBookingModal && selectedTutor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div

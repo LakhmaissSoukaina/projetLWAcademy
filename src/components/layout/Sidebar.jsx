@@ -13,6 +13,7 @@ function Sidebar() {
     { to: "/admin/courses", icon: "school", label: "Courses" },
     { to: "/admin/tutors", icon: "person_search", label: "Tuteurs" },
     { to: "/admin/ai", icon: "insights", label: "IA Reports" },
+    { to: "/admin/professor-requests", icon: "person_add", label: "Demandes Professeurs" }, // ← AJOUT
   ];
 
   const isActiveRoute = (path, exact = false) => {
