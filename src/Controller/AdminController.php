@@ -494,24 +494,22 @@ public function generateAIReport(Request $request, EntityManagerInterface $em): 
         $data = json_decode($request->getContent(), true);
         $type = $data['type'] ?? 'global_report';
         
-        // Récupérer les statistiques
         $totalStudents = $em->getRepository(User::class)->countByRole('ROLE_ETUDIANT');
         $totalCourses = $em->getRepository(Course::class)->count([]);
         $totalProfessors = $em->getRepository(User::class)->countByRole('ROLE_PROF');
         
-        $report = "========================================\n";
-        $report .= "     RAPPORT ADMINISTRATION IA\n";
-        $report .= "========================================\n\n";
-        $report .= "Date: " . (new \DateTime())->format('d/m/Y H:i:s') . "\n";
-        $report .= "Généré par: " . $admin->getEmail() . "\n\n";
-        $report .= "--- STATISTIQUES ---\n";
-        $report .= "Total étudiants: " . $totalStudents . "\n";
-        $report .= "Total cours: " . $totalCourses . "\n\n";
-        $report .= "--- RECOMMANDATIONS ---\n";
-        $report .= "- Optimiser les performances\n";
-        $report .= "- Planifier une maintenance\n\n";
-        $report .= "--- OBJECTIFS ---\n";
-        $report .= "Atteindre 1000 étudiants actifs\n";
+        $report = "RAPPORT ADMINISTRATION\n\n";
+        $report .= "Date : " . (new \DateTime())->format('d/m/Y H:i:s') . "\n";
+        $report .= "Généré par : " . $admin->getEmail() . "\n\n";
+        $report .= "Statistiques globales :\n";
+        $report .= "Total étudiants : " . $totalStudents . "\n";
+        $report .= "Total professeurs : " . $totalProfessors . "\n";
+        $report .= "Total cours : " . $totalCourses . "\n\n";
+        $report .= "Recommandations :\n";
+        $report .= "- Optimiser les performances du système.\n";
+        $report .= "- Planifier une maintenance mensuelle.\n";
+        $report .= "- Former les nouveaux utilisateurs.\n\n";
+        $report .= "Objectifs : Atteindre 1000 étudiants actifs d'ici la fin du semestre.\n";
         
         return $this->json([
             'success' => true,
@@ -525,10 +523,7 @@ public function generateAIReport(Request $request, EntityManagerInterface $em): 
         ]);
         
     } catch (\Exception $e) {
-        return $this->json([
-            'success' => false,
-            'error' => $e->getMessage()
-        ], 500);
+        return $this->json(['error' => $e->getMessage()], 500);
     }
 }
 #[Route('/ai/stats', name: 'admin_ai_stats', methods: ['GET'])]

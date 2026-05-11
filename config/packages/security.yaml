@@ -30,7 +30,12 @@ security:
             jwt: ~
 
     access_control:
+        - { path: ^/api/auth/professor-application, roles: PUBLIC_ACCESS }
+        - { path: ^/api/admin/professor-applications, roles: ROLE_ADMIN }
         - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
-        - { path: ^/api/hello, roles: PUBLIC_ACCESS }
-        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/me, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/student, roles: ROLE_ETUDIANT }
+        - { path: ^/api/professor, roles: ROLE_PROF }
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api/ai, roles: IS_AUTHENTICATED_FULLY }

@@ -158,29 +158,45 @@ public function getSuggestions(EntityManagerInterface $em): JsonResponse
 
     // ============ RAPPORT PERSONNEL ÉTUDIANT ============
     #[Route('/student/my-report', methods: ['GET'])]
-    #[IsGranted('ROLE_ETUDIANT')]
-    public function generateMyReport(): JsonResponse
-    {
-        try {
-            $student = $this->getUser();
-            
-            $report = "**📊 RAPPORT DE PROGRESSION**\n\n";
-            $report .= "Étudiant : " . $student->getNomComplet() . "\n";
-            $report .= "Progression : " . $student->getOverallProgress() . "%\n";
-            $report .= "Moyenne quiz : " . $student->getQuizAverage() . "/100\n\n";
-            $report .= "**Points forts :**\n- Bonne progression générale\n- Participation active\n\n";
-            $report .= "**Points à améliorer :**\n- Continuer les révisions régulières\n- Participer aux sessions de tutorat\n\n";
-            $report .= "**Objectifs :** Atteindre 85% de progression dans 4 semaines";
-            
-            return $this->json([
-                'success' => true,
-                'report' => $report,
-                'generated_at' => (new \DateTime())->format('Y-m-d H:i:s')
-            ]);
-        } catch (\Exception $e) {
-            return $this->json(['error' => $e->getMessage()], 500);
+#[IsGranted('ROLE_ETUDIANT')]
+public function generateMyReport(): JsonResponse
+{
+    try {
+        $student = $this->getUser();
+        $progress = $student->getOverallProgress();
+        $quizAvg = $student->getQuizAverage();
+        
+        $report = "RAPPORT DE PROGRESSION\n\n";
+        $report .= "Étudiant : " . $student->getNomComplet() . "\n";
+        $report .= "Date : " . (new \DateTime())->format('d/m/Y H:i') . "\n\n";
+        
+        $report .= "Synthèse des performances :\n";
+        $report .= "Votre progression globale est de " . $progress . "% et votre moyenne aux quiz est de " . $quizAvg . "/100.\n\n";
+        
+        if ($progress >= 70) {
+            $report .= "Points forts : Vous avez une excellente progression. Continuez sur cette lancée, vous maîtrisez bien les concepts clés.\n\n";
+        } elseif ($progress >= 50) {
+            $report .= "Points forts : Vous avez une progression correcte. Votre compréhension des fondamentaux est satisfaisante.\n\n";
+        } else {
+            $report .= "Points à améliorer : Votre progression nécessite plus d'attention. Il serait bénéfique de revoir les chapitres précédents.\n\n";
         }
+        
+        $report .= "Recommandations :\n";
+        $report .= "- Révisez quotidiennement les chapitres en cours.\n";
+        $report .= "- Participez aux sessions de tutorat disponibles.\n";
+        $report .= "- Complétez tous les quiz d'auto-évaluation.\n\n";
+        
+        $report .= "Objectifs : Atteindre un score minimum de 75/100 dans les prochains quiz et augmenter votre progression de 15% d'ici la fin du mois.\n";
+        
+        return $this->json([
+            'success' => true,
+            'report' => $report,
+            'generated_at' => (new \DateTime())->format('Y-m-d H:i:s')
+        ]);
+    } catch (\Exception $e) {
+        return $this->json(['error' => $e->getMessage()], 500);
     }
+}
 
     // ============ PLAN D'ÉTUDE ============
     // ============ PLAN D'ÉTUDE ==========
@@ -190,64 +206,47 @@ public function generateStudyPlanAI(): JsonResponse
 {
     try {
         $student = $this->getUser();
-        
-        if (!$student) {
-            return $this->json(['error' => 'Non authentifié'], 401);
-        }
-        
         $progress = $student->getOverallProgress();
         
-        $plan = "========================================\n";
-        $plan .= "        PLAN D'ETUDE PERSONNALISE        \n";
-        $plan .= "========================================\n\n";
-        $plan .= "Etudiant : " . $student->getNomComplet() . "\n";
+        $plan = "PLAN D'ETUDE PERSONNALISE\n\n";
+        $plan .= "Étudiant : " . $student->getNomComplet() . "\n";
         $plan .= "Progression actuelle : " . $progress . "%\n\n";
-        $plan .= "----------------------------------------\n";
-        $plan .= "OBJECTIF PRINCIPAL\n";
-        $plan .= "----------------------------------------\n";
         
+        $plan .= "Objectif principal : ";
         if ($progress < 50) {
-            $plan .= "Consolider les bases fondamentales\n\n";
-            $plan .= "Semaine 1 : Revoir les chapitres 1 a 3\n";
-            $plan .= "Semaine 2 : Exercices pratiques quotidiens\n";
-            $plan .= "Semaine 3 : Sessions de tutorat obligatoires\n";
-            $plan .= "Semaine 4 : Preparation examen\n";
+            $plan .= "Consolider les bases fondamentales.\n\n";
+            $plan .= "Semaine 1 : Revoir les chapitres 1 à 3.\n";
+            $plan .= "Semaine 2 : Effectuer les exercices pratiques quotidiens.\n";
+            $plan .= "Semaine 3 : Participer aux sessions de tutorat obligatoires.\n";
+            $plan .= "Semaine 4 : Préparer l'examen final.\n\n";
         } elseif ($progress < 75) {
-            $plan .= "Renforcer la comprehension\n\n";
-            $plan .= "Semaine 1 : Revoir les chapitres 4 a 6\n";
-            $plan .= "Semaine 2 : Cas pratiques avances\n";
-            $plan .= "Semaine 3 : Revision ciblee\n";
-            $plan .= "Semaine 4 : Simulations d'examen\n";
+            $plan .= "Renforcer la compréhension des concepts avancés.\n\n";
+            $plan .= "Semaine 1 : Revoir les chapitres 4 à 6.\n";
+            $plan .= "Semaine 2 : Traiter les cas pratiques avancés.\n";
+            $plan .= "Semaine 3 : Effectuer une révision ciblée.\n";
+            $plan .= "Semaine 4 : Réaliser des simulations d'examen.\n\n";
         } else {
-            $plan .= "Excellence academique\n\n";
-            $plan .= "Semaine 1 : Sujets avances\n";
-            $plan .= "Semaine 2 : Recherche personnelle\n";
-            $plan .= "Semaine 3 : Preparation certification\n";
-            $plan .= "Semaine 4 : Revision finale\n";
+            $plan .= "Atteindre l'excellence académique.\n\n";
+            $plan .= "Semaine 1 : Explorer les sujets avancés.\n";
+            $plan .= "Semaine 2 : Mener des recherches personnelles.\n";
+            $plan .= "Semaine 3 : Préparer les certifications.\n";
+            $plan .= "Semaine 4 : Effectuer une révision finale approfondie.\n\n";
         }
         
-        $plan .= "\n----------------------------------------\n";
-        $plan .= "CONSEILS QUOTIDIENS\n";
-        $plan .= "----------------------------------------\n";
-        $plan .= "- Revisez 30 minutes chaque matin\n";
-        $plan .= "- Notez vos questions\n";
-        $plan .= "- Participez aux sessions de tutorat\n";
-        $plan .= "- Faites tous les quiz proposes\n\n";
-        $plan .= "----------------------------------------\n";
-        $plan .= "OBJECTIF : Atteindre " . min(100, $progress + 20) . "% de progression\n";
-        $plan .= "----------------------------------------\n";
+        $plan .= "Conseils quotidiens :\n";
+        $plan .= "- Révisez 30 minutes chaque matin.\n";
+        $plan .= "- Notez vos questions pour les sessions de tutorat.\n";
+        $plan .= "- Complétez tous les quiz proposés.\n\n";
+        
+        $plan .= "Objectif final : Atteindre " . min(100, $progress + 20) . "% de progression d'ici 4 semaines.\n";
         
         return $this->json([
             'success' => true,
             'study_plan' => $plan,
             'generated_at' => (new \DateTime())->format('Y-m-d H:i:s')
         ]);
-        
     } catch (\Exception $e) {
-        return $this->json([
-            'success' => false,
-            'error' => $e->getMessage()
-        ], 500);
+        return $this->json(['error' => $e->getMessage()], 500);
     }
 }
 // ============ PROFESSEUR AI REPORTS ============
@@ -257,62 +256,52 @@ public function professorClassReport(EntityManagerInterface $em): JsonResponse
 {
     try {
         $professor = $this->getUser();
-        
-        // Récupérer tous les étudiants du professeur
         $students = $em->getRepository(User::class)->findStudentsByProfessor($professor);
         
         if (empty($students)) {
             return $this->json(['error' => 'Aucun étudiant trouvé'], 404);
         }
         
-        // Calculer les statistiques
         $totalStudents = count($students);
         $totalProgress = 0;
-        $totalQuiz = 0;
         $studentsAtRisk = 0;
-        $topStudents = 0;
         
         foreach ($students as $student) {
             $progress = $student->getOverallProgress();
-            $quizAvg = $student->getQuizAverage();
-            
             $totalProgress += $progress;
-            $totalQuiz += $quizAvg;
-            
             if ($progress < 50) $studentsAtRisk++;
-            if ($progress >= 85) $topStudents++;
         }
         
         $avgProgress = round($totalProgress / $totalStudents, 1);
-        $avgQuiz = round($totalQuiz / $totalStudents, 1);
         
-        $report = "========================================\n";
-        $report .= "     RAPPORT DE CLASSE IA\n";
-        $report .= "========================================\n\n";
-        $report .= "Professeur: " . $professor->getNomComplet() . "\n";
-        $report .= "Date: " . (new \DateTime())->format('d/m/Y H:i') . "\n\n";
-        $report .= "--- STATISTIQUES GLOBALES ---\n";
-        $report .= "Total étudiants: " . $totalStudents . "\n";
-        $report .= "Progression moyenne: " . $avgProgress . "%\n";
-        $report .= "Moyenne quiz: " . $avgQuiz . "/100\n";
-        $report .= "Etudiants en difficulte: " . $studentsAtRisk . "\n";
-        $report .= "Meilleurs etudiants: " . $topStudents . "\n\n";
-        $report .= "--- RECOMMANDATIONS ---\n";
+        $report = "RAPPORT DE CLASSE\n\n";
+        $report .= "Professeur : " . $professor->getNomComplet() . "\n";
+        $report .= "Date : " . (new \DateTime())->format('d/m/Y H:i') . "\n";
+        $report .= "Total étudiants : " . $totalStudents . "\n";
+        $report .= "Progression moyenne de la classe : " . $avgProgress . "%\n";
+        $report .= "Étudiants en difficulté : " . $studentsAtRisk . "\n\n";
         
+        if ($avgProgress >= 70) {
+            $report .= "Analyse : La classe affiche une très bonne progression globale. Les résultats sont satisfaisants.\n\n";
+        } elseif ($avgProgress >= 50) {
+            $report .= "Analyse : La classe a une progression correcte mais des efforts supplémentaires sont nécessaires.\n\n";
+        } else {
+            $report .= "Analyse : La classe rencontre des difficultés significatives. Une attention particulière est requise.\n\n";
+        }
+        
+        $report .= "Recommandations pédagogiques :\n";
         if ($studentsAtRisk > 0) {
-            $report .= "- Organiser des sessions de soutien pour les " . $studentsAtRisk . " etudiants en difficulte\n";
+            $report .= "- Organiser des sessions de soutien pour les " . $studentsAtRisk . " étudiants en difficulté.\n";
         }
         if ($avgProgress < 70) {
-            $report .= "- Revoir les concepts cles en cours\n";
-            $report .= "- Augmenter la frequence des quiz\n";
-        }
-        if ($avgProgress >= 70) {
-            $report .= "- Maintenir le rythme actuel\n";
-            $report .= "- Proposer des exercices avances\n";
+            $report .= "- Revoir les concepts clés en cours collectif.\n";
+            $report .= "- Augmenter la fréquence des quiz d'évaluation.\n";
+        } else {
+            $report .= "- Maintenir le rythme actuel.\n";
+            $report .= "- Proposer des exercices avancés pour les meilleurs étudiants.\n";
         }
         
-        $report .= "\n--- PERSPECTIVES ---\n";
-        $report .= "Objectif: Atteindre 85% de progression moyenne d'ici 2 mois\n";
+        $report .= "\nObjectif : Atteindre 85% de progression moyenne d'ici 2 mois.\n";
         
         return $this->json([
             'success' => true,
@@ -320,13 +309,10 @@ public function professorClassReport(EntityManagerInterface $em): JsonResponse
             'statistics' => [
                 'total_students' => $totalStudents,
                 'avg_progress' => $avgProgress,
-                'avg_quiz_score' => $avgQuiz,
-                'students_at_risk' => $studentsAtRisk,
-                'top_students' => $topStudents
+                'students_at_risk' => $studentsAtRisk
             ],
             'generated_at' => (new \DateTime())->format('Y-m-d H:i:s')
         ]);
-        
     } catch (\Exception $e) {
         return $this->json(['error' => $e->getMessage()], 500);
     }
@@ -340,38 +326,34 @@ public function professorStudentReport(int $id, EntityManagerInterface $em): Jso
         $student = $em->getRepository(User::class)->find($id);
         
         if (!$student || !$student->isStudent()) {
-            return $this->json(['error' => 'Etudiant non trouve'], 404);
+            return $this->json(['error' => 'Étudiant non trouvé'], 404);
         }
-        
-        $report = "========================================\n";
-        $report .= "     RAPPORT INDIVIDUEL IA\n";
-        $report .= "========================================\n\n";
-        $report .= "Etudiant: " . $student->getNomComplet() . "\n";
-        $report .= "Email: " . $student->getEmail() . "\n";
-        $report .= "Date: " . (new \DateTime())->format('d/m/Y H:i') . "\n\n";
-        $report .= "--- PERFORMANCES ---\n";
-        $report .= "Progression globale: " . $student->getOverallProgress() . "%\n";
-        $report .= "Moyenne quiz: " . $student->getQuizAverage() . "/100\n";
-        $report .= "Moyenne devoirs: " . $student->getAssignmentAverage() . "/20\n";
-        $report .= "Quiz completes: " . $student->getTotalCompletedQuizzes() . "\n";
-        $report .= "Devoirs rendus: " . $student->getTotalSubmittedAssignments() . "\n\n";
-        $report .= "--- ANALYSE ---\n";
         
         $progress = $student->getOverallProgress();
+        $quizAvg = $student->getQuizAverage();
+        
+        $report = "RAPPORT INDIVIDUEL\n\n";
+        $report .= "Étudiant : " . $student->getNomComplet() . "\n";
+        $report .= "Email : " . $student->getEmail() . "\n";
+        $report .= "Date : " . (new \DateTime())->format('d/m/Y H:i') . "\n\n";
+        $report .= "Progression globale : " . $progress . "%\n";
+        $report .= "Moyenne aux quiz : " . $quizAvg . "/100\n\n";
+        
         if ($progress < 50) {
-            $report .= "L'etudiant rencontre des difficultes significatives.\n";
-            $report .= "Recommandations: Sessions de tutorat obligatoires\n";
+            $report .= "Analyse : L'étudiant rencontre des difficultés significatives dans son apprentissage.\n";
+            $report .= "Recommandations : Mettre en place des sessions de tutorat obligatoires et un suivi personnalisé.\n\n";
         } elseif ($progress < 75) {
-            $report .= "Progression correcte mais peut etre amelioree.\n";
-            $report .= "Recommandations: Revisions regulieres\n";
+            $report .= "Analyse : La progression de l'étudiant est correcte mais peut être améliorée.\n";
+            $report .= "Recommandations : Encourager des révisions régulières et la participation aux sessions de tutorat.\n\n";
         } else {
-            $report .= "Excellent travail ! L'etudiant est sur la bonne voie.\n";
-            $report .= "Recommandations: Maintenir le rythme\n";
+            $report .= "Analyse : Excellent travail ! L'étudiant est sur la bonne voie et maîtrise bien les concepts.\n";
+            $report .= "Recommandations : Maintenir le rythme actuel et proposer des défis supplémentaires.\n\n";
         }
         
-        $report .= "\n--- OBJECTIFS ---\n";
-        $report .= "- Atteindre " . min(100, $progress + 20) . "% de progression\n";
-        $report .= "- Participer aux sessions de tutorat\n";
+        $report .= "Objectifs :\n";
+        $report .= "- Atteindre " . min(100, $progress + 20) . "% de progression globale.\n";
+        $report .= "- Participer aux sessions de tutorat.\n";
+        $report .= "- Compléter tous les quiz et devoirs restants.\n";
         
         return $this->json([
             'success' => true,
@@ -379,12 +361,11 @@ public function professorStudentReport(int $id, EntityManagerInterface $em): Jso
             'student' => [
                 'id' => $student->getId(),
                 'name' => $student->getNomComplet(),
-                'quiz_average' => $student->getQuizAverage(),
-                'overall_progress' => $student->getOverallProgress()
+                'quiz_average' => $quizAvg,
+                'overall_progress' => $progress
             ],
             'generated_at' => (new \DateTime())->format('Y-m-d H:i:s')
         ]);
-        
     } catch (\Exception $e) {
         return $this->json(['error' => $e->getMessage()], 500);
     }
