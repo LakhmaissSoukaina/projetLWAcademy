@@ -18,6 +18,11 @@ export const getCourseDetails = async (courseId) => {
   return response.data;
 };
 
+export const getCourseDetailsWithContent = async (courseId) => {
+  const response = await api.get(`/student/courses/${courseId}/details`);
+  return response.data;
+};
+
 // ============ TUTORS ============
 export const getAvailableTutors = async () => {
   const response = await api.get("/student/tutors");
@@ -89,7 +94,6 @@ export const getReportDetails = async (reportId) => {
   const response = await api.get(`/student/reports/${reportId}`);
   return response.data;
 };
-// frontend/src/api/studentApi.js - Ajoute à la fin du fichier
 
 // ============ IA ASSISTANT ============
 export const generateMyReport = async () => {

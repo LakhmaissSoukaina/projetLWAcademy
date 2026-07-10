@@ -31,8 +31,7 @@ import QuizManager from "../pages/professor/QuizManager";
 import Analytics from "../pages/professor/Analytics";
 import ProfessorStudents from "../pages/professor/ProfessorStudents";
 import ProfessorAIReports from "../pages/professor/ProfessorAIReports";
-
-// =========================
+import StudentCourseDetail from "../pages/student/StudentCourseDetail";// =========================
 // STUDENT
 // =========================
 import StudentLayout from "../components/layout/StudentLayout";
@@ -159,6 +158,7 @@ function AppRouter() {
         <Route path="quizes" element={<StudentQuiz />} />
         <Route path="assignments" element={<StudentAssignment />} />
         <Route path="aireports" element={<StudentReport />} />
+        <Route path="/student/courses/:id" element={<StudentCourseDetail />} />
       </Route>
 
       {/* TUTOR ROUTES */}

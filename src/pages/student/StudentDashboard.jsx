@@ -155,10 +155,13 @@ export default function StudentDashboard() {
                 <span className="material-symbols-outlined">quiz</span>
               </div>
               <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-                {Math.round((stats.quizCompletion.completed / stats.quizCompletion.total) * 100)}%
+                {/* ✅ LIGNE CORRIGÉE */}
+                {stats?.quizCompletion?.total > 0 
+                  ? Math.round((stats.quizCompletion.completed / stats.quizCompletion.total) * 100) 
+                  : 0}%
               </span>
             </div>
-            <h2 className="text-3xl font-black text-gray-800">{stats.quizCompletion.completed}/{stats.quizCompletion.total}</h2>
+            <h2 className="text-3xl font-black text-gray-800">{stats?.quizCompletion?.completed || 0}/{stats?.quizCompletion?.total || 0}</h2>
             <p className="text-sm text-gray-500 mt-1">Quiz Completion</p>
           </div>
 
@@ -172,7 +175,7 @@ export default function StudentDashboard() {
                 4.2%
               </span>
             </div>
-            <h2 className="text-3xl font-black text-gray-800">{stats.overallProgress}%</h2>
+            <h2 className="text-3xl font-black text-gray-800">{stats.overallProgress || 0}%</h2>
             <p className="text-sm text-gray-500 mt-1">Overall Progress</p>
           </div>
 
@@ -182,10 +185,10 @@ export default function StudentDashboard() {
                 <span className="material-symbols-outlined">calendar_today</span>
               </div>
               <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
-                {stats.nextSession ? new Date(stats.nextSession.date).toLocaleDateString('en-US', { weekday: 'short' }) : "Tomorrow"}
+                {stats?.nextSession ? new Date(stats.nextSession.date).toLocaleDateString('en-US', { weekday: 'short' }) : "Tomorrow"}
               </span>
             </div>
-            <h2 className="text-3xl font-black">{stats.nextSession?.time || "10:30 AM"}</h2>
+            <h2 className="text-3xl font-black">{stats?.nextSession?.time || "10:30 AM"}</h2>
             <p className="text-sm text-blue-100 mt-1">Next Session</p>
           </div>
         </section>
@@ -232,10 +235,10 @@ export default function StudentDashboard() {
                       <div>
                         <div className="flex justify-between text-sm mb-2">
                           <span className="font-semibold">Progress</span>
-                          <span className="font-bold text-blue-700">{course.progress}%</span>
+                          <span className="font-bold text-blue-700">{course.progress || 0}%</span>
                         </div>
                         <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-700" style={{ width: `${course.progress}%` }}></div>
+                          <div className="h-full bg-blue-700" style={{ width: `${course.progress || 0}%` }}></div>
                         </div>
                       </div>
                     </div>

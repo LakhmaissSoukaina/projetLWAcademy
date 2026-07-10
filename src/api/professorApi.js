@@ -28,10 +28,7 @@ export const createCourse = async (courseData) => {
   return response.data;
 };
 
-export const updateCourse = async (courseId, courseData) => {
-  const response = await api.put(`/professor/courses/${courseId}`, courseData);
-  return response.data;
-};
+
 
 // ============ STUDENTS ============
 export const getProfessorStudents = async () => {
@@ -126,5 +123,67 @@ export const generateIndividualStudentReport = async (studentId) => {
 
 export const getAISuggestions = async () => {
   const response = await api.get("/ai/suggestions");
+  return response.data;
+};
+// frontend/src/api/professorApi.js
+// Ajoute à la fin du fichier
+
+// ============ COURSE CONTENT MANAGEMENT ============
+export const addChapter = async (courseId, chapterData) => {
+  const response = await api.post(`/courses/${courseId}/add-chapter`, chapterData);
+  return response.data;
+};
+
+// frontend/src/api/professorApi.js
+
+export const addContentToChapter = async (courseId, contentData) => {
+  // Si c'est un FormData, ne pas définir Content-Type (axios le fera automatiquement)
+  const isFormData = contentData instanceof FormData;
+  
+  const config = {};
+  if (isFormData) {
+    config.headers = {
+      'Content-Type': 'multipart/form-data',
+    };
+  }
+  
+  const response = await api.post(`/courses/${courseId}/add-content`, contentData, config);
+  return response.data;
+};
+
+export const getCourseWithContent = async (courseId) => {
+  const response = await api.get(`/courses/${courseId}`);
+  return response.data;
+};
+// ============ DELETE & UPDATE CONTENT ============
+export const deleteContent = async (courseId, contentId) => {
+  const response = await api.delete(`/courses/${courseId}/content/${contentId}`);
+  return response.data;
+};
+
+export const updateContent = async (courseId, contentId, contentData) => {
+  const response = await api.put(`/courses/${courseId}/content/${contentId}`, contentData);
+  return response.data;
+};
+
+// ============ DELETE & UPDATE CHAPTER ============
+export const deleteChapter = async (courseId, chapterId) => {
+  const response = await api.delete(`/courses/${courseId}/chapter/${chapterId}`);
+  return response.data;
+};
+
+export const updateChapter = async (courseId, chapterId, chapterData) => {
+  const response = await api.put(`/courses/${courseId}/chapter/${chapterId}`, chapterData);
+  return response.data;
+};
+
+// ============ DELETE & UPDATE COURSE ============
+export const deleteCourse = async (courseId) => {
+  const response = await api.delete(`/courses/${courseId}`);
+  return response.data;
+};
+
+export const updateCourse = async (courseId, courseData) => {
+  const response = await api.put(`/courses/${courseId}`, courseData);
   return response.data;
 };

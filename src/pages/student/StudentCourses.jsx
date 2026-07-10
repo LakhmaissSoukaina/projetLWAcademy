@@ -1,10 +1,12 @@
 // src/pages/student/StudentCourses.jsx
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { getStudentCourses } from "../../api/studentApi";
 
 export default function StudentCourses() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
@@ -33,7 +35,7 @@ export default function StudentCourses() {
       setCourses(data);
     } catch (error) {
       console.error("Error loading courses:", error);
-      // Données mockées (avec images conservées)
+      // Données mockées
       setCourses([
         {
           id: 1,
@@ -99,7 +101,7 @@ export default function StudentCourses() {
     return ["All Levels", ...new Set(levels)];
   };
 
-  // Filtrage : combine les filtres classiques + recherche globale (titre, catégorie, professeur, niveau)
+  // Filtrage
   const filteredCourses = courses.filter(course => {
     const matchesSubject = selectedSubject === "All Subjects" || course.category === selectedSubject;
     const matchesLevel = selectedLevel === "All Levels" || course.level === selectedLevel;
@@ -131,7 +133,7 @@ export default function StudentCourses() {
 
   return (
     <div className="space-y-8">
-      {/* Header avec badge de recherche */}
+      {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
           <h1 className="text-4xl font-black text-blue-800 mb-2">
@@ -159,7 +161,7 @@ export default function StudentCourses() {
         </button>
       </div>
 
-      {/* Filtres existants (catégorie et niveau) */}
+      {/* Filtres */}
       <div className="flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
         <div className="flex items-center gap-3">
           <span className="font-semibold text-gray-600">Filter by:</span>
@@ -204,14 +206,15 @@ export default function StudentCourses() {
         </div>
       </div>
 
-      {/* Grille des cours */}
+      {/* Grille des cours - AJOUT DE onNavigate */}
       <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-8">
         {filteredCourses.map((course) => (
           <div
             key={course.id}
-            className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:-translate-y-2 hover:shadow-xl transition-all duration-500 group"
+            onClick={() => navigate(`/student/courses/${course.id}`)}
+            className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:-translate-y-2 hover:shadow-xl transition-all duration-500 group cursor-pointer"
           >
-            {/* Image (conservée) */}
+            {/* Image */}
             <div className="relative h-56 overflow-hidden">
               {course.image ? (
                 <img
@@ -264,7 +267,7 @@ export default function StudentCourses() {
           </div>
         ))}
 
-        {/* Carte "Explore More" (affichée seulement si des cours sont visibles) */}
+        {/* Carte "Explore More" */}
         {filteredCourses.length > 0 && (
           <div className="border-2 border-dashed border-gray-300 rounded-3xl bg-white/50 flex flex-col items-center justify-center text-center p-10 hover:border-blue-700 transition-all cursor-pointer group min-h-[450px]">
             <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-6 group-hover:bg-blue-700 transition-all">
