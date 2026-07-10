@@ -6,6 +6,7 @@ use App\Entity\Assignment;
 use App\Entity\AssignmentSubmission;
 use App\Entity\AISuggestion;
 use App\Entity\Course;
+use App\Entity\Enrollment;
 use App\Entity\Question;
 use App\Entity\Quiz;
 use App\Entity\QuizAttempt;
@@ -37,7 +38,6 @@ class AppFixtures extends Fixture
                 $user = new User();
                 $user->setEmail($email);
                 
-                // Définir le mot de passe selon l'email
                 if ($email === 'admin@wcentre.com') {
                     $user->setPassword($this->passwordHasher->hashPassword($user, 'admin123'));
                     $user->setRoles(['ROLE_ADMIN']);
@@ -73,7 +73,6 @@ class AppFixtures extends Fixture
         
         $manager->flush();
         
-        // Récupérer les utilisateurs créés
         $admin = $users['admin@wcentre.com'];
         $prof = $users['prof@wcentre.com'];
         $etudiant = $users['etudiant@wcentre.com'];
@@ -174,31 +173,29 @@ class AppFixtures extends Fixture
                 $manager->persist($quiz);
                 $quizzes[] = $quiz;
                 
-                // Ajouter des questions
-                // Ajouter des questions
-$questions = [
-    [
-        'text' => 'Quelle est la principale caractéristique de ' . $course->getTitle() . ' ?',
-        'type' => 'multiple_choice',
-        'points' => 25,
-        'options' => ['Option A', 'Option B', 'Option C', 'Option D'],
-        'correct' => 'Option A'
-    ],
-    [
-        'text' => 'La technologie ' . $course->getTitle() . ' est-elle adaptée aux débutants ?',
-        'type' => 'true_false',
-        'points' => 25,
-        'options' => null,
-        'correct' => 'Vrai'
-    ],
-    [
-        'text' => 'Expliquez en quelques lignes ce que vous avez appris dans ce cours.',
-        'type' => 'essay',
-        'points' => 50,
-        'options' => null,
-        'correct' => null
-    ],
-];
+                $questions = [
+                    [
+                        'text' => 'Quelle est la principale caractéristique de ' . $course->getTitle() . ' ?',
+                        'type' => 'multiple_choice',
+                        'points' => 25,
+                        'options' => ['Option A', 'Option B', 'Option C', 'Option D'],
+                        'correct' => 'Option A'
+                    ],
+                    [
+                        'text' => 'La technologie ' . $course->getTitle() . ' est-elle adaptée aux débutants ?',
+                        'type' => 'true_false',
+                        'points' => 25,
+                        'options' => null,
+                        'correct' => 'Vrai'
+                    ],
+                    [
+                        'text' => 'Expliquez en quelques lignes ce que vous avez appris dans ce cours.',
+                        'type' => 'essay',
+                        'points' => 50,
+                        'options' => null,
+                        'correct' => null
+                    ],
+                ];
                 
                 foreach ($questions as $qData) {
                     $question = new Question();
@@ -214,26 +211,27 @@ $questions = [
         }
         
         $manager->flush();
+        
         // ========== SESSIONS POUR LE PROFESSEUR ==========
-// Ajouter des sessions où le professeur est tuteur
-$prof = $users['prof@wcentre.com'];
-$etudiantsList = $etudiants;
+        $prof = $users['prof@wcentre.com'];
+        $etudiantsList = $etudiants;
 
-for ($i = 0; $i < 5; $i++) {
-    $session = new Session();
-    $session->setTitle("Session de tutorat avec Professeur - Cours " . ($i + 1));
-    $date = new \DateTime('+' . ($i + 5) . ' days');
-    $date->setTime(15, 0, 0);
-    $session->setDate($date);
-    $session->setDuration(60);
-    $session->setTutor($prof);  // Professeur comme tuteur
-    $session->setStudent($etudiantsList[$i % count($etudiantsList)]);
-    $session->setCourse($cours[$i % count($cours)]);
-    $session->setStatus('scheduled');
-    $session->setMeetingLink("https://meet.google.com/prof-session-" . uniqid());
-    $session->setNotes("Session de révision avec le Professeur");
-    $manager->persist($session);
-}
+        for ($i = 0; $i < 5; $i++) {
+            $session = new Session();
+            $session->setTitle("Session de tutorat avec Professeur - Cours " . ($i + 1));
+            $date = new \DateTime('+' . ($i + 5) . ' days');
+            $date->setTime(15, 0, 0);
+            $session->setDate($date);
+            $session->setDuration(60);
+            $session->setTutor($prof);
+            $session->setStudent($etudiantsList[$i % count($etudiantsList)]);
+            $session->setCourse($cours[$i % count($cours)]);
+            $session->setStatus('scheduled');
+            $session->setMeetingLink("https://meet.google.com/prof-session-" . uniqid());
+            $session->setNotes("Session de révision avec le Professeur");
+            $manager->persist($session);
+        }
+        
         // ========== 4. CRÉATION DES SESSIONS (COURS/TUTEUR) ==========
         
         for ($i = 0; $i < 10; $i++) {
@@ -254,17 +252,15 @@ for ($i = 0; $i < 5; $i++) {
         
         $manager->flush();
         
-        // ========== 5. CRÉATION DES TENTATIVES DE QUIZ POUR L'ÉTUDIANT ==========
+        // ========== 5. CRÉATION DES TENTATIVES DE QUIZ ==========
         
         foreach ($etudiants as $etudiant) {
             foreach ($quizzes as $quiz) {
-                // 70% de chance d'avoir tenté le quiz
                 if (rand(1, 100) <= 70) {
                     $attempt = new QuizAttempt();
                     $attempt->setQuiz($quiz);
                     $attempt->setStudent($etudiant);
                     
-                    // Générer des réponses aléatoires
                     $answers = [];
                     foreach ($quiz->getQuestions() as $question) {
                         if ($question->getType() === 'multiple_choice') {
@@ -277,7 +273,6 @@ for ($i = 0; $i < 5; $i++) {
                     }
                     $attempt->setAnswers($answers);
                     
-                    // Calculer le score
                     $score = 0;
                     foreach ($quiz->getQuestions() as $question) {
                         if (isset($answers[$question->getId()]) && $answers[$question->getId()] === $question->getCorrectAnswer()) {
@@ -295,7 +290,7 @@ for ($i = 0; $i < 5; $i++) {
             }
         }
         
-        // ========== 6. CRÉATION DES ASSIGNMENTS (DEVOIRS) ==========
+        // ========== 6. CRÉATION DES ASSIGNMENTS ==========
         
         $assignments = [];
         foreach ($cours as $course) {
@@ -318,7 +313,6 @@ for ($i = 0; $i < 5; $i++) {
         
         foreach ($etudiants as $etudiant) {
             foreach ($assignments as $assignment) {
-                // 60% de chance d'avoir soumis le devoir
                 if (rand(1, 100) <= 60) {
                     $submission = new AssignmentSubmission();
                     $submission->setAssignment($assignment);
@@ -326,7 +320,6 @@ for ($i = 0; $i < 5; $i++) {
                     $submission->setContent("Voici ma réponse pour le devoir " . $assignment->getTitle() . ". J'ai bien compris les concepts.");
                     $submission->setSubmittedAt(new \DateTime('- ' . rand(1, 14) . ' days'));
                     
-                    // 80% des soumissions sont notées
                     if (rand(1, 100) <= 80) {
                         $submission->setGrade(rand(10, 20));
                         $submission->setFeedback("Bon travail ! Continuez comme ça.");
@@ -345,25 +338,25 @@ for ($i = 0; $i < 5; $i++) {
         // ========== 8. CRÉATION DES SUGGESTIONS IA ==========
         
         $iaSuggestions = [
-    [
-        'user' => $etudiant,
-        'type' => 'study_plan',
-        'content' => "Plan d'étude recommandé : Révisez Symfony 6 cette semaine, concentrez-vous sur les contrôleurs et les entités.",
-        'context' => ['difficulty' => 'medium', 'recommended_hours' => 5]
-    ],
-    [
-        'user' => $etudiant,
-        'type' => 'student_report',
-        'content' => "Rapport de progression : L'étudiant a complété 70% des quiz avec une moyenne de 75/100.",
-        'context' => ['progress' => 70, 'average' => 75]
-    ],
-    [
-        'user' => $prof,
-        'type' => 'global_report',
-        'content' => "Rapport global de la classe : La promotion progresse bien, 85% des étudiants ont réussi leurs examens.",
-        'context' => ['success_rate' => 85, 'total_students' => 10]
-    ],
-];
+            [
+                'user' => $etudiant,
+                'type' => 'study_plan',
+                'content' => "Plan d'étude recommandé : Révisez Symfony 6 cette semaine, concentrez-vous sur les contrôleurs et les entités.",
+                'context' => ['difficulty' => 'medium', 'recommended_hours' => 5]
+            ],
+            [
+                'user' => $etudiant,
+                'type' => 'student_report',
+                'content' => "Rapport de progression : L'étudiant a complété 70% des quiz avec une moyenne de 75/100.",
+                'context' => ['progress' => 70, 'average' => 75]
+            ],
+            [
+                'user' => $prof,
+                'type' => 'global_report',
+                'content' => "Rapport global de la classe : La promotion progresse bien, 85% des étudiants ont réussi leurs examens.",
+                'context' => ['success_rate' => 85, 'total_students' => 10]
+            ],
+        ];
         
         foreach ($iaSuggestions as $suggestionData) {
             $suggestion = new AISuggestion();
@@ -373,6 +366,52 @@ for ($i = 0; $i < 5; $i++) {
             $suggestion->setContext($suggestionData['context']);
             $suggestion->setGeneratedAt(new \DateTime('- ' . rand(1, 15) . ' days'));
             $manager->persist($suggestion);
+        }
+        
+        // ========== 9. INSCRIPTIONS DES ÉTUDIANTS AUX COURS ==========
+        
+        // Récupérer tous les étudiants (sauf profs et admins)
+        $allStudents = [];
+        foreach ($etudiants as $etudiant) {
+            if (!$etudiant->isProfessor() && !$etudiant->isAdmin()) {
+                $allStudents[] = $etudiant;
+            }
+        }
+        
+        // Ajouter l'étudiant par défaut s'il n'est pas déjà dans la liste
+        $defaultStudent = $users['etudiant@wcentre.com'] ?? null;
+        if ($defaultStudent && !in_array($defaultStudent, $allStudents)) {
+            $allStudents[] = $defaultStudent;
+        }
+        
+        if (count($allStudents) > 0 && count($cours) > 0) {
+            // Chaque étudiant s'inscrit à 2-3 cours
+            foreach ($allStudents as $etudiant) {
+                $nbCourses = rand(2, min(3, count($cours)));
+                $courseIndices = array_rand($cours, $nbCourses);
+                
+                if (!is_array($courseIndices)) {
+                    $courseIndices = [$courseIndices];
+                }
+                
+                foreach ($courseIndices as $index) {
+                    // Vérifier si déjà inscrit
+                    $existingEnrollment = $manager->getRepository(Enrollment::class)->findOneBy([
+                        'student' => $etudiant,
+                        'course' => $cours[$index],
+                        'status' => 'active'
+                    ]);
+                    
+                    if (!$existingEnrollment) {
+                        $enrollment = new Enrollment();
+                        $enrollment->setStudent($etudiant);
+                        $enrollment->setCourse($cours[$index]);
+                        $enrollment->setEnrolledAt(new \DateTimeImmutable());
+                        $enrollment->setStatus('active');
+                        $manager->persist($enrollment);
+                    }
+                }
+            }
         }
         
         $manager->flush();

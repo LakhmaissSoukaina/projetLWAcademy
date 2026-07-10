@@ -1,10 +1,13 @@
 <?php
+// src/Controller/StudentController.php
 
 namespace App\Controller;
 
 use App\Entity\Assignment;
 use App\Entity\AssignmentSubmission;
+use App\Entity\Chapter;
 use App\Entity\Course;
+use App\Entity\Enrollment;
 use App\Entity\Quiz;
 use App\Entity\QuizAttempt;
 use App\Entity\Session;
@@ -27,30 +30,57 @@ class StudentController extends AbstractController
 {
     // ============ DASHBOARD ============
     #[Route('/stats', name: 'stats', methods: ['GET'])]
-    public function getStats(): JsonResponse
+    public function getStats(EntityManagerInterface $em): JsonResponse
     {
         /** @var User $user */
         $user = $this->getUser();
         
+        $enrollments = $em->getRepository(Enrollment::class)->findBy([
+            'student' => $user,
+            'status' => 'active'
+        ]);
+        
+        $totalCourses = count($enrollments);
+        $totalProgress = 0;
+        $completedCourses = 0;
+        
+        foreach ($enrollments as $enrollment) {
+            $progress = $this->calculateCourseProgress($enrollment->getCourse());
+            $totalProgress += $progress;
+            if ($progress >= 100) {
+                $completedCourses++;
+            }
+        }
+        
         return $this->json([
             'quiz_average' => $user->getQuizAverage(),
             'assignment_average' => $user->getAssignmentAverage(),
-            'overall_progress' => $user->getOverallProgress(),
+            'overall_progress' => $totalCourses > 0 ? round($totalProgress / $totalCourses) : 0,
             'completed_quizzes' => $user->getTotalCompletedQuizzes(),
             'submitted_assignments' => $user->getTotalSubmittedAssignments(),
             'upcoming_sessions' => $this->getUpcomingSessionsCount($user),
             'best_quiz_score' => $user->getBestQuizScore(),
             'best_assignment_grade' => $user->getBestAssignmentGrade(),
-            'total_courses' => $this->getTotalCoursesCount(),
+            'total_courses' => $totalCourses,
+            'completed_courses' => $completedCourses,
             'completed_assignments' => $user->getTotalGradedAssignments()
         ]);
     }
 
     // ============ COURSES ============
     #[Route('/courses', name: 'courses', methods: ['GET'])]
-    public function getCourses(CourseRepository $repository): JsonResponse
+    public function getCourses(EntityManagerInterface $em): JsonResponse
     {
-        $courses = $repository->findBy(['status' => 'published']);
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        // Récupérer les inscriptions de l'étudiant
+        $enrollments = $em->getRepository(Enrollment::class)->findBy([
+            'student' => $user,
+            'status' => 'active'
+        ]);
+        
+        $courses = array_map(fn($e) => $e->getCourse(), $enrollments);
         
         return $this->json(array_map(function($course) {
             return [
@@ -60,16 +90,30 @@ class StudentController extends AbstractController
                 'category' => $course->getCategory(),
                 'level' => $course->getLevel(),
                 'progress' => $this->calculateCourseProgress($course),
-                'professor' => $course->getProfessor()->getNomComplet(), // ← CHANGÉ : retourne une chaîne
-                'professorId' => $course->getProfessor()->getId(), // ← AJOUTÉ : ID du professeur
-                'professorEmail' => $course->getProfessor()->getEmail() // ← AJOUTÉ : email du professeur
+                'professor' => $course->getProfessor()->getNomComplet(),
+                'professorId' => $course->getProfessor()->getId(),
+                'professorEmail' => $course->getProfessor()->getEmail()
             ];
         }, $courses));
     }
 
     #[Route('/courses/{id}', name: 'course_details', methods: ['GET'])]
-    public function getCourseDetails(Course $course): JsonResponse
+    public function getCourseDetails(Course $course, EntityManagerInterface $em): JsonResponse
     {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        // Vérifier que l'étudiant est inscrit
+        $enrollment = $em->getRepository(Enrollment::class)->findOneBy([
+            'student' => $user,
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        if (!$enrollment) {
+            return $this->json(['error' => 'You are not enrolled in this course'], 403);
+        }
+        
         if ($course->getStatus() !== 'published') {
             return $this->json(['error' => 'Course not available'], 403);
         }
@@ -80,7 +124,7 @@ class StudentController extends AbstractController
             'description' => $course->getDescription(),
             'category' => $course->getCategory(),
             'level' => $course->getLevel(),
-            'professor' => $course->getProfessor()->getNomComplet(), // ← CHANGÉ : retourne une chaîne
+            'professor' => $course->getProfessor()->getNomComplet(),
             'professorId' => $course->getProfessor()->getId(),
             'professorEmail' => $course->getProfessor()->getEmail(),
             'quizzes' => array_map(function($quiz) {
@@ -101,6 +145,59 @@ class StudentController extends AbstractController
                     'submitted' => $this->hasSubmittedAssignment($assignment)
                 ];
             }, $course->getAssignments()->toArray())
+        ]);
+    }
+
+    #[Route('/courses/{id}/details', name: 'course_details_with_content', methods: ['GET'])]
+    public function getCourseDetailsWithContent(Course $course, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        // Vérifier que l'étudiant est inscrit
+        $enrollment = $em->getRepository(Enrollment::class)->findOneBy([
+            'student' => $user,
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        if (!$enrollment) {
+            return $this->json(['error' => 'You are not enrolled in this course'], 403);
+        }
+        
+        if ($course->getStatus() !== 'published') {
+            return $this->json(['error' => 'Course not available'], 403);
+        }
+        
+        $chapters = $em->getRepository(Chapter::class)->findBy(
+            ['course' => $course],
+            ['number' => 'ASC']
+        );
+        
+        return $this->json([
+            'id' => $course->getId(),
+            'title' => $course->getTitle(),
+            'description' => $course->getDescription(),
+            'category' => $course->getCategory(),
+            'level' => $course->getLevel(),
+            'professor' => $course->getProfessor()->getNomComplet(),
+            'chapters' => array_map(function($chapter) {
+                return [
+                    'id' => $chapter->getId(),
+                    'number' => $chapter->getNumber(),
+                    'title' => $chapter->getTitle(),
+                    'contents' => array_map(function($content) {
+                        return [
+                            'id' => $content->getId(),
+                            'title' => $content->getTitle(),
+                            'type' => $content->getType(),
+                            'filePath' => $content->getFilePath(),
+                            'fileSize' => $content->getFileSize(),
+                            'duration' => $content->getDuration()
+                        ];
+                    }, $chapter->getContents()->toArray())
+                ];
+            }, $chapters)
         ]);
     }
 

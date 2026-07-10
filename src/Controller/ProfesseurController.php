@@ -1,10 +1,12 @@
 <?php
+// src/Controller/ProfesseurController.php
 
 namespace App\Controller;
 
 use App\Entity\Assignment;
 use App\Entity\AssignmentSubmission;
 use App\Entity\Course;
+use App\Entity\Enrollment;
 use App\Entity\Quiz;
 use App\Entity\QuizAttempt;
 use App\Entity\Session;
@@ -28,39 +30,47 @@ class ProfesseurController extends AbstractController
 {
     // ============ DASHBOARD ============
     #[Route('/stats', name: 'stats', methods: ['GET'])]
-public function getStats(EntityManagerInterface $em): JsonResponse
-{
-    /** @var User $user */
-    $user = $this->getUser();
-    
-    // Récupérer les cours du professeur
-    $courses = $em->getRepository(Course::class)->findBy(['professor' => $user]);
-    
-    // Compter les cours publiés
-    $publishedCourses = count(array_filter($courses, fn($c) => $c->getStatus() === 'published'));
-    
-    // Statistiques des étudiants
-    $students = $em->getRepository(User::class)->findStudentsByProfessor($user);
-    $totalStudents = count($students);
-    
-    // Sessions programmées (live)
-    $upcomingSessions = $em->getRepository(Session::class)->createQueryBuilder('s')
-        ->where('s.tutor = :user')
-        ->andWhere('s.date > :now')
-        ->andWhere('s.status = :status')
-        ->setParameter('user', $user)
-        ->setParameter('now', new \DateTime())
-        ->setParameter('status', 'scheduled')
-        ->getQuery()
-        ->getResult();
-    
-    return $this->json([
-        'totalStudents' => $totalStudents,
-        'publishedCourses' => $publishedCourses,
-        'liveSessions' => count($upcomingSessions),
-        'successRate' => $this->calculateStudentSuccessRate($students)
-    ]);
-}
+    public function getStats(EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        // Récupérer les cours du professeur
+        $courses = $em->getRepository(Course::class)->findBy(['professor' => $user]);
+        
+        // Compter les cours publiés
+        $publishedCourses = count(array_filter($courses, fn($c) => $c->getStatus() === 'published'));
+        
+        // Statistiques des étudiants via Enrollment
+        $enrollments = $em->getRepository(Enrollment::class)->createQueryBuilder('e')
+            ->innerJoin('e.course', 'c')
+            ->where('c.professor = :user')
+            ->andWhere('e.status = :status')
+            ->setParameter('user', $user)
+            ->setParameter('status', 'active')
+            ->getQuery()
+            ->getResult();
+        
+        $totalStudents = count($enrollments);
+        
+        // Sessions programmées (live)
+        $upcomingSessions = $em->getRepository(Session::class)->createQueryBuilder('s')
+            ->where('s.tutor = :user')
+            ->andWhere('s.date > :now')
+            ->andWhere('s.status = :status')
+            ->setParameter('user', $user)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('status', 'scheduled')
+            ->getQuery()
+            ->getResult();
+        
+        return $this->json([
+            'totalStudents' => $totalStudents,
+            'publishedCourses' => $publishedCourses,
+            'liveSessions' => count($upcomingSessions),
+            'successRate' => $this->calculateStudentSuccessRate($enrollments)
+        ]);
+    }
 
     // ============ COURSES ============
     #[Route('/courses', name: 'courses', methods: ['GET'])]
@@ -192,31 +202,40 @@ public function getStats(EntityManagerInterface $em): JsonResponse
 
     // ============ STUDENTS ============
     #[Route('/students', name: 'students', methods: ['GET'])]
-    #[Route('/students', name: 'students', methods: ['GET'])]
-public function getStudents(EntityManagerInterface $em): JsonResponse
-{
-    /** @var User $user */
-    $user = $this->getUser();
-    $students = $em->getRepository(User::class)->findStudentsByProfessor($user);
-    
-    return $this->json(array_map(function($student) {
-        return [
-            'id' => $student->getId(),
-            'name' => $student->getNomComplet(),
-            'email' => $student->getEmail(),
-            // Avatar - soit la photo de l'étudiant, soit un avatar généré
-            'avatar' => $this->getStudentAvatar($student),
-            'subjects' => $this->getStudentSubjects($student),
-            'quiz_average' => $student->getQuizAverage(),
-            'assignment_average' => $student->getAssignmentAverage(),
-            'overall_progress' => $student->getOverallProgress(),
-            'completed_quizzes' => $student->getTotalCompletedQuizzes(),
-            'submitted_assignments' => $student->getTotalSubmittedAssignments(),
-            'last_active' => $this->getLastActiveDate($student),
-            'status' => $student->isTuteur() ? 'tutor' : 'student'
-        ];
-    }, $students));
-}
+    public function getStudents(EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        // Récupérer les étudiants inscrits aux cours du professeur via Enrollment
+        $enrollments = $em->getRepository(Enrollment::class)->createQueryBuilder('e')
+            ->innerJoin('e.course', 'c')
+            ->where('c.professor = :user')
+            ->andWhere('e.status = :status')
+            ->setParameter('user', $user)
+            ->setParameter('status', 'active')
+            ->getQuery()
+            ->getResult();
+        
+        $students = array_unique(array_map(fn($e) => $e->getStudent(), $enrollments));
+        
+        return $this->json(array_map(function($student) {
+            return [
+                'id' => $student->getId(),
+                'name' => $student->getNomComplet(),
+                'email' => $student->getEmail(),
+                'avatar' => $this->getStudentAvatar($student),
+                'subjects' => $this->getStudentSubjects($student),
+                'quiz_average' => $student->getQuizAverage(),
+                'assignment_average' => $student->getAssignmentAverage(),
+                'overall_progress' => $student->getOverallProgress(),
+                'completed_quizzes' => $student->getTotalCompletedQuizzes(),
+                'submitted_assignments' => $student->getTotalSubmittedAssignments(),
+                'last_active' => $this->getLastActiveDate($student),
+                'status' => $student->isProfessor() ? 'tutor' : 'student'
+            ];
+        }, $students));
+    }
 
     #[Route('/students/{id}', name: 'student_details', methods: ['GET'])]
     public function getStudentDetails(User $student, EntityManagerInterface $em): JsonResponse
@@ -224,19 +243,20 @@ public function getStudents(EntityManagerInterface $em): JsonResponse
         /** @var User $user */
         $user = $this->getUser();
         
-        // Vérifier que l'étudiant appartient à un cours du professeur
-        $belongsToProfessor = $em->getRepository(User::class)->createQueryBuilder('u')
-            ->innerJoin('u.studentSessions', 's')
-            ->innerJoin('s.course', 'c')
-            ->where('c.professor = :professor')
-            ->andWhere('u.id = :student')
+        // Vérifier que l'étudiant est inscrit à un cours du professeur
+        $enrollment = $em->getRepository(Enrollment::class)->createQueryBuilder('e')
+            ->innerJoin('e.course', 'c')
+            ->where('e.student = :student')
+            ->andWhere('c.professor = :professor')
+            ->andWhere('e.status = :status')
+            ->setParameter('student', $student)
             ->setParameter('professor', $user)
-            ->setParameter('student', $student->getId())
+            ->setParameter('status', 'active')
             ->getQuery()
             ->getOneOrNullResult();
         
-        if (!$belongsToProfessor && !$user->isAdmin()) {
-            return $this->json(['error' => 'Unauthorized'], 403);
+        if (!$enrollment && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized - This student is not in your courses'], 403);
         }
         
         return $this->json([
@@ -265,10 +285,332 @@ public function getStudents(EntityManagerInterface $em): JsonResponse
             return $this->json(['error' => 'Course ID and grade are required'], 400);
         }
         
-        // Logique pour mettre à jour la note (à adapter selon ta structure)
-        // Par exemple, trouver le devoir ou quiz correspondant
-        
+        // Logique pour mettre à jour la note
         return $this->json(['message' => 'Grade updated successfully']);
+    }
+
+    // ============ ENROLLMENT MANAGEMENT ============
+    
+    #[Route('/courses/{id}/enroll-student', name: 'enroll_student', methods: ['POST'])]
+    public function enrollStudent(Course $course, Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if ($course->getProfessor() !== $user && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized - You are not the professor of this course'], 403);
+        }
+        
+        $data = json_decode($request->getContent(), true);
+        
+        if (!isset($data['studentId'])) {
+            return $this->json(['error' => 'Student ID is required'], 400);
+        }
+        
+        $student = $em->getRepository(User::class)->find($data['studentId']);
+        if (!$student) {
+            return $this->json(['error' => 'Student not found'], 404);
+        }
+        
+        if (!$student->isStudent()) {
+            return $this->json(['error' => 'User is not a student'], 400);
+        }
+        
+        // Vérifier si déjà inscrit
+        $existing = $em->getRepository(Enrollment::class)->findOneBy([
+            'student' => $student,
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        if ($existing) {
+            return $this->json(['error' => 'Student already enrolled in this course'], 400);
+        }
+        
+        $enrollment = new Enrollment();
+        $enrollment->setStudent($student);
+        $enrollment->setCourse($course);
+        $enrollment->setEnrolledAt(new \DateTimeImmutable());
+        $enrollment->setStatus('active');
+        
+        $em->persist($enrollment);
+        $em->flush();
+        
+        return $this->json([
+            'message' => 'Student enrolled successfully',
+            'enrollment' => [
+                'id' => $enrollment->getId(),
+                'student' => $student->getNomComplet(),
+                'studentId' => $student->getId(),
+                'course' => $course->getTitle(),
+                'courseId' => $course->getId(),
+                'enrolledAt' => $enrollment->getEnrolledAt()->format('Y-m-d H:i:s'),
+                'status' => $enrollment->getStatus()
+            ]
+        ], 201);
+    }
+
+    #[Route('/courses/{id}/unenroll-student', name: 'unenroll_student', methods: ['DELETE'])]
+    public function unenrollStudent(Course $course, Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if ($course->getProfessor() !== $user && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized - You are not the professor of this course'], 403);
+        }
+        
+        $data = json_decode($request->getContent(), true);
+        
+        if (!isset($data['studentId'])) {
+            return $this->json(['error' => 'Student ID is required'], 400);
+        }
+        
+        $student = $em->getRepository(User::class)->find($data['studentId']);
+        if (!$student) {
+            return $this->json(['error' => 'Student not found'], 404);
+        }
+        
+        $enrollment = $em->getRepository(Enrollment::class)->findOneBy([
+            'student' => $student,
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        if (!$enrollment) {
+            return $this->json(['error' => 'Student is not enrolled in this course'], 404);
+        }
+        
+        $enrollment->setStatus('inactive');
+        $em->flush();
+        
+        return $this->json([
+            'message' => 'Student unenrolled successfully',
+            'student' => $student->getNomComplet(),
+            'course' => $course->getTitle()
+        ]);
+    }
+
+    #[Route('/courses/{id}/students', name: 'course_students', methods: ['GET'])]
+    public function getCourseStudents(Course $course, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if ($course->getProfessor() !== $user && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized - You are not the professor of this course'], 403);
+        }
+        
+        $enrollments = $em->getRepository(Enrollment::class)->findBy([
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        $students = array_map(function($enrollment) {
+            $student = $enrollment->getStudent();
+            return [
+                'id' => $student->getId(),
+                'name' => $student->getNomComplet(),
+                'email' => $student->getEmail(),
+                'photo' => $student->getPhoto(),
+                'enrolledAt' => $enrollment->getEnrolledAt()->format('Y-m-d H:i:s'),
+                'quizAverage' => $student->getQuizAverage(),
+                'assignmentAverage' => $student->getAssignmentAverage(),
+                'overallProgress' => $student->getOverallProgress()
+            ];
+        }, $enrollments);
+        
+        return $this->json([
+            'course' => [
+                'id' => $course->getId(),
+                'title' => $course->getTitle()
+            ],
+            'totalStudents' => count($students),
+            'students' => $students
+        ]);
+    }
+
+    #[Route('/students/{id}/courses', name: 'student_courses', methods: ['GET'])]
+    public function getStudentCourses(User $student, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if (!$user->isAdmin()) {
+            $hasStudent = $em->getRepository(Enrollment::class)->createQueryBuilder('e')
+                ->innerJoin('e.course', 'c')
+                ->where('e.student = :student')
+                ->andWhere('c.professor = :professor')
+                ->andWhere('e.status = :status')
+                ->setParameter('student', $student)
+                ->setParameter('professor', $user)
+                ->setParameter('status', 'active')
+                ->getQuery()
+                ->getResult();
+            
+            if (empty($hasStudent)) {
+                return $this->json(['error' => 'Unauthorized - This student is not in your courses'], 403);
+            }
+        }
+        
+        $enrollments = $em->getRepository(Enrollment::class)->findBy([
+            'student' => $student,
+            'status' => 'active'
+        ]);
+        
+        $courses = array_map(function($enrollment) {
+            $course = $enrollment->getCourse();
+            return [
+                'id' => $course->getId(),
+                'title' => $course->getTitle(),
+                'description' => $course->getDescription(),
+                'category' => $course->getCategory(),
+                'level' => $course->getLevel(),
+                'professor' => $course->getProfessor()->getNomComplet(),
+                'enrolledAt' => $enrollment->getEnrolledAt()->format('Y-m-d H:i:s')
+            ];
+        }, $enrollments);
+        
+        return $this->json([
+            'student' => [
+                'id' => $student->getId(),
+                'name' => $student->getNomComplet(),
+                'email' => $student->getEmail()
+            ],
+            'totalCourses' => count($courses),
+            'courses' => $courses
+        ]);
+    }
+
+    #[Route('/courses/{id}/enroll-students', name: 'enroll_students', methods: ['POST'])]
+    public function enrollStudents(Course $course, Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if ($course->getProfessor() !== $user && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized'], 403);
+        }
+        
+        $data = json_decode($request->getContent(), true);
+        
+        if (!isset($data['studentIds']) || !is_array($data['studentIds'])) {
+            return $this->json(['error' => 'studentIds array is required'], 400);
+        }
+        
+        $success = [];
+        $failed = [];
+        
+        foreach ($data['studentIds'] as $studentId) {
+            $student = $em->getRepository(User::class)->find($studentId);
+            
+            if (!$student) {
+                $failed[] = ['studentId' => $studentId, 'reason' => 'Student not found'];
+                continue;
+            }
+            
+            if (!$student->isStudent()) {
+                $failed[] = ['studentId' => $studentId, 'reason' => 'Not a student'];
+                continue;
+            }
+            
+            $existing = $em->getRepository(Enrollment::class)->findOneBy([
+                'student' => $student,
+                'course' => $course,
+                'status' => 'active'
+            ]);
+            
+            if ($existing) {
+                $failed[] = ['studentId' => $studentId, 'reason' => 'Already enrolled'];
+                continue;
+            }
+            
+            $enrollment = new Enrollment();
+            $enrollment->setStudent($student);
+            $enrollment->setCourse($course);
+            $enrollment->setEnrolledAt(new \DateTimeImmutable());
+            $enrollment->setStatus('active');
+            
+            $em->persist($enrollment);
+            $success[] = ['studentId' => $studentId, 'name' => $student->getNomComplet()];
+        }
+        
+        $em->flush();
+        
+        return $this->json([
+            'message' => 'Enrollment processed',
+            'success' => count($success) . ' students enrolled',
+            'successful' => $success,
+            'failed' => $failed
+        ]);
+    }
+
+    #[Route('/courses/{id}/check-enrollment/{studentId}', name: 'check_enrollment', methods: ['GET'])]
+    public function checkEnrollment(Course $course, int $studentId, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        if ($course->getProfessor() !== $user && !$user->isAdmin()) {
+            return $this->json(['error' => 'Unauthorized'], 403);
+        }
+        
+        $student = $em->getRepository(User::class)->find($studentId);
+        if (!$student) {
+            return $this->json(['error' => 'Student not found'], 404);
+        }
+        
+        $enrollment = $em->getRepository(Enrollment::class)->findOneBy([
+            'student' => $student,
+            'course' => $course,
+            'status' => 'active'
+        ]);
+        
+        return $this->json([
+            'studentId' => $studentId,
+            'studentName' => $student->getNomComplet(),
+            'courseId' => $course->getId(),
+            'courseTitle' => $course->getTitle(),
+            'isEnrolled' => $enrollment !== null,
+            'enrolledAt' => $enrollment ? $enrollment->getEnrolledAt()->format('Y-m-d H:i:s') : null,
+            'status' => $enrollment ? $enrollment->getStatus() : 'not_enrolled'
+        ]);
+    }
+
+    #[Route('/enrollment-stats', name: 'enrollment_stats', methods: ['GET'])]
+    public function getEnrollmentStats(EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        
+        $courses = $em->getRepository(Course::class)->findBy(['professor' => $user]);
+        
+        $stats = array_map(function($course) use ($em) {
+            $enrollments = $em->getRepository(Enrollment::class)->findBy([
+                'course' => $course,
+                'status' => 'active'
+            ]);
+            
+            return [
+                'courseId' => $course->getId(),
+                'courseTitle' => $course->getTitle(),
+                'totalStudents' => count($enrollments),
+                'students' => array_map(function($enrollment) {
+                    $student = $enrollment->getStudent();
+                    return [
+                        'id' => $student->getId(),
+                        'name' => $student->getNomComplet(),
+                        'email' => $student->getEmail()
+                    ];
+                }, $enrollments)
+            ];
+        }, $courses);
+        
+        return $this->json([
+            'professor' => $user->getNomComplet(),
+            'totalCourses' => count($courses),
+            'courses' => $stats
+        ]);
     }
 
     // ============ QUIZZES ============
@@ -486,136 +828,101 @@ public function getStudents(EntityManagerInterface $em): JsonResponse
     }
 
     // ============ ANALYTICS ============
-#[Route('/analytics', name: 'analytics', methods: ['GET'])]
-public function getAnalytics(EntityManagerInterface $em): JsonResponse
-{
-    try {
-        /** @var User $user */
-        $user = $this->getUser();
-        
-        // Récupérer les cours du professeur
-        $courses = $em->getRepository(Course::class)->findBy(['professor' => $user]);
-        
-        // Construire topCourses à partir des vrais cours
-        $topCourses = [];
-        foreach (array_slice($courses, 0, 3) as $course) {
-            $studentsCount = $this->getCourseStudentsCount($course);
-            $avgProgress = $this->getCourseAverageProgress($course);
+    #[Route('/analytics', name: 'analytics', methods: ['GET'])]
+    public function getAnalytics(EntityManagerInterface $em): JsonResponse
+    {
+        try {
+            /** @var User $user */
+            $user = $this->getUser();
             
-            // Choisir une icône en fonction de la catégorie
-            $icon = $this->getIconForCategory($course->getCategory());
-            $bgColor = $this->getColorForCategory($course->getCategory());
+            // Récupérer les cours du professeur
+            $courses = $em->getRepository(Course::class)->findBy(['professor' => $user]);
             
-            $topCourses[] = [
-                'title' => $course->getTitle(),
-                'enrolled' => $studentsCount . ' Enrolled',
-                'rating' => '4.8 Rating', // À calculer si tu as des données
-                'completion' => round($avgProgress) . '%',
-                'icon' => $icon,
-                'color' => $bgColor,
-                'image' => null // Pas d'image, on utilise l'icône
+            // Construire topCourses
+            $topCourses = [];
+            foreach (array_slice($courses, 0, 3) as $course) {
+                $studentsCount = $this->getCourseStudentsCount($course);
+                $avgProgress = $this->getCourseAverageProgress($course);
+                
+                $icon = $this->getIconForCategory($course->getCategory());
+                $bgColor = $this->getColorForCategory($course->getCategory());
+                
+                $topCourses[] = [
+                    'title' => $course->getTitle(),
+                    'enrolled' => $studentsCount . ' Enrolled',
+                    'rating' => '4.8 Rating',
+                    'completion' => round($avgProgress) . '%',
+                    'icon' => $icon,
+                    'color' => $bgColor,
+                    'image' => null
+                ];
+            }
+            
+            // Récupérer les étudiants via Enrollment
+            $enrollments = $em->getRepository(Enrollment::class)->createQueryBuilder('e')
+                ->innerJoin('e.course', 'c')
+                ->where('c.professor = :user')
+                ->andWhere('e.status = :status')
+                ->setParameter('user', $user)
+                ->setParameter('status', 'active')
+                ->getQuery()
+                ->getResult();
+            
+            $students = array_unique(array_map(fn($e) => $e->getStudent(), $enrollments));
+            
+            // Top étudiants
+            $topStudents = [];
+            foreach (array_slice($students, 0, 3) as $index => $student) {
+                $topStudents[] = [
+                    'id' => $student->getId(),
+                    'name' => $student->getNomComplet(),
+                    'rank' => $index + 1,
+                    'score' => round($student->getQuizAverage(), 1) . '%',
+                    'initials' => substr($student->getPrenom(), 0, 1) . substr($student->getNom(), 0, 1)
+                ];
+            }
+            
+            // Calculer les stats globales
+            $totalStudents = count($students);
+            $avgProgress = $totalStudents > 0 ? array_sum(array_map(fn($s) => $s->getOverallProgress(), $students)) / $totalStudents : 0;
+            $avgQuizScore = $totalStudents > 0 ? array_sum(array_map(fn($s) => $s->getQuizAverage(), $students)) / $totalStudents : 0;
+            
+            // Insights IA
+            $insights = [
+                [
+                    'title' => 'Top Difficulty',
+                    'content' => '72% of students struggled with advanced concepts in recent quizzes.'
+                ],
+                [
+                    'title' => 'Engagement Trend',
+                    'content' => 'Course interaction peaked in the evening hours.'
+                ]
             ];
+            
+            return $this->json([
+                'totalStudents' => $totalStudents,
+                'avgDailyActive' => rand(50, 200),
+                'completionRate' => round($avgProgress, 1),
+                'quizPerformance' => round($avgQuizScore, 1),
+                'topCourses' => $topCourses,
+                'topStudents' => $topStudents,
+                'insights' => $insights,
+                'heatmap' => $this->generateHeatmap()
+            ]);
+            
+        } catch (\Exception $e) {
+            return $this->json([
+                'totalStudents' => 0,
+                'avgDailyActive' => 0,
+                'completionRate' => 0,
+                'quizPerformance' => 0,
+                'topCourses' => [],
+                'topStudents' => [],
+                'insights' => [],
+                'heatmap' => []
+            ]);
         }
-        
-        // Récupérer les étudiants
-        $students = $em->getRepository(User::class)->findStudentsByProfessor($user);
-        
-        // Top étudiants
-        $topStudents = [];
-        foreach (array_slice($students, 0, 3) as $index => $student) {
-            $topStudents[] = [
-                'id' => $student->getId(),
-                'name' => $student->getNomComplet(),
-                'rank' => $index + 1,
-                'score' => round($student->getQuizAverage(), 1) . '%',
-                'initials' => substr($student->getPrenom(), 0, 1) . substr($student->getNom(), 0, 1)
-            ];
-        }
-        
-        // Calculer les stats globales
-        $totalStudents = count($students);
-        $avgProgress = $totalStudents > 0 ? array_sum(array_map(fn($s) => $s->getOverallProgress(), $students)) / $totalStudents : 0;
-        $avgQuizScore = $totalStudents > 0 ? array_sum(array_map(fn($s) => $s->getQuizAverage(), $students)) / $totalStudents : 0;
-        
-        // Insights IA
-        $insights = [
-            [
-                'title' => 'Top Difficulty',
-                'content' => '72% of students struggled with advanced concepts in recent quizzes.'
-            ],
-            [
-                'title' => 'Engagement Trend',
-                'content' => 'Course interaction peaked in the evening hours.'
-            ]
-        ];
-        
-        return $this->json([
-            'totalStudents' => $totalStudents,
-            'avgDailyActive' => rand(50, 200),
-            'completionRate' => round($avgProgress, 1),
-            'quizPerformance' => round($avgQuizScore, 1),
-            'topCourses' => $topCourses,
-            'topStudents' => $topStudents,
-            'insights' => $insights,
-            'heatmap' => $this->generateHeatmap()
-        ]);
-        
-    } catch (\Exception $e) {
-        return $this->json([
-            'totalStudents' => 0,
-            'avgDailyActive' => 0,
-            'completionRate' => 0,
-            'quizPerformance' => 0,
-            'topCourses' => [],
-            'topStudents' => [],
-            'insights' => [],
-            'heatmap' => []
-        ]);
     }
-}
-
-// Ajoute ces méthodes helper :
-
-private function getIconForCategory(string $category): string
-{
-    $icons = [
-        'Programmation' => 'code',
-        'Base de données' => 'storage',
-        'DevOps' => 'cloud',
-        'Design' => 'palette',
-        'Littérature' => 'menu_book',
-        'Mathématiques' => 'calculate',
-        'Physique' => 'science',
-        'Sciences sociales' => 'psychology',
-        'default' => 'school'
-    ];
-    return $icons[$category] ?? $icons['default'];
-}
-
-private function getColorForCategory(string $category): string
-{
-    $colors = [
-        'Programmation' => 'bg-blue-100 text-blue-800',
-        'Base de données' => 'bg-green-100 text-green-800',
-        'DevOps' => 'bg-purple-100 text-purple-800',
-        'Design' => 'bg-pink-100 text-pink-800',
-        'Littérature' => 'bg-yellow-100 text-yellow-800',
-        'Mathématiques' => 'bg-indigo-100 text-indigo-800',
-        'Physique' => 'bg-cyan-100 text-cyan-800',
-        'default' => 'bg-gray-100 text-gray-800'
-    ];
-    return $colors[$category] ?? $colors['default'];
-}
-
-private function generateHeatmap(): array
-{
-    $heatmap = [];
-    $colors = ['bg-blue-50', 'bg-blue-100', 'bg-blue-200', 'bg-blue-400', 'bg-blue-600', 'bg-blue-800', 'bg-blue-900'];
-    for ($i = 0; $i < 35; $i++) {
-        $heatmap[] = $colors[array_rand($colors)];
-    }
-    return $heatmap;
-}
 
     #[Route('/analytics/courses/{id}', name: 'course_analytics', methods: ['GET'])]
     public function getCourseAnalytics(Course $course, EntityManagerInterface $em): JsonResponse
@@ -679,7 +986,6 @@ private function generateHeatmap(): array
         try {
             $report = $aiService->generateStudentReport($student);
             
-            // Sauvegarder le rapport
             $suggestion = new AISuggestion();
             $suggestion->setUser($this->getUser());
             $suggestion->setType('student_report');
@@ -702,80 +1008,54 @@ private function generateHeatmap(): array
     }
 
     // ============ PRIVATE HELPER METHODS ============
-    private function getStudentAvatar(User $student): string
-{
-    // Si l'étudiant a une photo, on l'utilise
-    if ($student->getPhoto()) {
-        return $student->getPhoto();
-    }
     
-    // Sinon, on génère un avatar avec UI Avatars (service gratuit)
-    $name = urlencode($student->getNomComplet());
-    return "https://ui-avatars.com/api/?name={$name}&background=3b82f6&color=fff&rounded=true&size=128&bold=true";
-}
+    private function getStudentAvatar(User $student): string
+    {
+        if ($student->getPhoto()) {
+            return $student->getPhoto();
+        }
+        
+        $name = urlencode($student->getNomComplet());
+        return "https://ui-avatars.com/api/?name={$name}&background=3b82f6&color=fff&rounded=true&size=128&bold=true";
+    }
 
-private function getStudentSubjects(User $student): array
-{
-    $subjects = [];
-    foreach ($student->getStudentSessions() as $session) {
-        if ($session->getCourse()) {
-            $category = $session->getCourse()->getCategory();
-            if (!in_array($category, $subjects)) {
-                $subjects[] = $category;
+    private function getStudentSubjects(User $student): array
+    {
+        $subjects = [];
+        foreach ($student->getStudentSessions() as $session) {
+            if ($session->getCourse()) {
+                $category = $session->getCourse()->getCategory();
+                if (!in_array($category, $subjects)) {
+                    $subjects[] = $category;
+                }
             }
         }
+        
+        if (empty($subjects)) {
+            return ['Mathématiques', 'Littérature'];
+        }
+        
+        return $subjects;
     }
-    
-    // Si aucun sujet trouvé, retourner des sujets par défaut
-    if (empty($subjects)) {
-        return ['Mathématiques', 'Littérature'];
-    }
-    
-    return $subjects;
-}
+
     private function getCourseStudentsCount(Course $course): int
     {
-        $students = [];
-        foreach ($course->getSessions() as $session) {
-            if ($session->getStudent() && !in_array($session->getStudent()->getId(), $students)) {
-                $students[] = $session->getStudent()->getId();
-            }
-        }
-        return count($students);
+        return $course->getEnrollments()->filter(fn($e) => $e->getStatus() === 'active')->count();
     }
 
     private function getCourseAverageProgress(Course $course): float
     {
-        $students = [];
-        $totalProgress = 0;
+        $students = $course->getStudents();
+        if ($students->isEmpty()) return 0;
         
-        foreach ($course->getSessions() as $session) {
-            if ($session->getStudent() && !in_array($session->getStudent()->getId(), $students)) {
-                $students[] = $session->getStudent()->getId();
-                $totalProgress += $session->getStudent()->getOverallProgress();
-            }
+        $totalProgress = 0;
+        foreach ($students as $student) {
+            $totalProgress += $student->getOverallProgress();
         }
         
-        if (count($students) === 0) return 0;
-        
-        return round($totalProgress / count($students), 1);
+        return round($totalProgress / $students->count(), 1);
     }
 
-    private function getCourseStudents(Course $course): array
-    {
-        $students = [];
-        foreach ($course->getSessions() as $session) {
-            if ($session->getStudent() && !isset($students[$session->getStudent()->getId()])) {
-                $students[$session->getStudent()->getId()] = [
-                    'id' => $session->getStudent()->getId(),
-                    'name' => $session->getStudent()->getNomComplet(),
-                    'email' => $session->getStudent()->getEmail(),
-                    'progress' => $session->getStudent()->getOverallProgress()
-                ];
-            }
-        }
-        return array_values($students);
-    }
 
     private function getLastActiveDate(User $student): ?string
     {
@@ -833,70 +1113,54 @@ private function getStudentSubjects(User $student): array
         return min($attempts->map(fn($a) => $a->getScore())->toArray());
     }
 
-    private function calculateAverageQuizScore(array $attempts): float
+    private function calculateStudentSuccessRate(array $enrollments): float
     {
-        if (empty($attempts)) return 0;
+        if (empty($enrollments)) return 0;
         
-        $total = array_sum(array_map(fn($a) => $a->getScore(), $attempts));
-        return $total / count($attempts);
-    }
-
-    private function calculateAverageAssignmentGrade(array $submissions): float
-    {
-        $graded = array_filter($submissions, fn($s) => $s->getGrade() !== null);
-        if (empty($graded)) return 0;
-        
-        $total = array_sum(array_map(fn($s) => $s->getGrade(), $graded));
-        return $total / count($graded);
-    }
-
-    private function calculateStudentSuccessRate(array $students): float
-    {
-        if (empty($students)) return 0;
-        
+        $students = array_unique(array_map(fn($e) => $e->getStudent(), $enrollments));
         $successful = count(array_filter($students, fn($s) => $s->getOverallProgress() >= 70));
         return round(($successful / count($students)) * 100, 1);
     }
 
-    private function getCoursesPerformance(array $courses): array
+    private function getIconForCategory(string $category): string
     {
-        return array_map(function($course) {
-            return [
-                'id' => $course->getId(),
-                'title' => $course->getTitle(),
-                'average_progress' => $this->getCourseAverageProgress($course),
-                'students_count' => $this->getCourseStudentsCount($course)
-            ];
-        }, $courses);
-    }
-
-    private function getStudentsProgressDistribution(User $professor): array
-    {
-        $students = $this->getDoctrine()->getRepository(User::class)->findStudentsByProfessor($professor);
-        $progresses = array_map(fn($s) => $s->getOverallProgress(), $students);
-        
-        return [
-            'excellent' => count(array_filter($progresses, fn($p) => $p >= 85)),
-            'good' => count(array_filter($progresses, fn($p) => $p >= 70 && $p < 85)),
-            'average' => count(array_filter($progresses, fn($p) => $p >= 50 && $p < 70)),
-            'at_risk' => count(array_filter($progresses, fn($p) => $p < 50))
+        $icons = [
+            'Programmation' => 'code',
+            'Base de données' => 'storage',
+            'DevOps' => 'cloud',
+            'Design' => 'palette',
+            'Littérature' => 'menu_book',
+            'Mathématiques' => 'calculate',
+            'Physique' => 'science',
+            'Sciences sociales' => 'psychology',
+            'default' => 'school'
         ];
+        return $icons[$category] ?? $icons['default'];
     }
 
-    private function getEngagementStats(User $professor): array
+    private function getColorForCategory(string $category): string
     {
-        // À implémenter selon tes besoins
-        return [
-            'daily_active' => 0,
-            'weekly_active' => 0,
-            'monthly_active' => 0
+        $colors = [
+            'Programmation' => 'bg-blue-100 text-blue-800',
+            'Base de données' => 'bg-green-100 text-green-800',
+            'DevOps' => 'bg-purple-100 text-purple-800',
+            'Design' => 'bg-pink-100 text-pink-800',
+            'Littérature' => 'bg-yellow-100 text-yellow-800',
+            'Mathématiques' => 'bg-indigo-100 text-indigo-800',
+            'Physique' => 'bg-cyan-100 text-cyan-800',
+            'default' => 'bg-gray-100 text-gray-800'
         ];
+        return $colors[$category] ?? $colors['default'];
     }
 
-    private function getMonthlyActivity(User $professor): array
+    private function generateHeatmap(): array
     {
-        // À implémenter selon tes besoins
-        return [];
+        $heatmap = [];
+        $colors = ['bg-blue-50', 'bg-blue-100', 'bg-blue-200', 'bg-blue-400', 'bg-blue-600', 'bg-blue-800', 'bg-blue-900'];
+        for ($i = 0; $i < 35; $i++) {
+            $heatmap[] = $colors[array_rand($colors)];
+        }
+        return $heatmap;
     }
 
     private function getCourseStudentsAnalytics(Course $course): array

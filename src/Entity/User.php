@@ -75,6 +75,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: AISuggestion::class, mappedBy: 'user')]
     private Collection $aiSuggestions;
 
+    // ========== NOUVELLE RELATION AVEC ENROLLMENT ==========
+    #[ORM\OneToMany(mappedBy: 'student', targetEntity: Enrollment::class, cascade: ['persist', 'remove'])]
+    private Collection $enrollments;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -87,6 +91,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->submissions = new ArrayCollection();
         $this->courses = new ArrayCollection();
         $this->aiSuggestions = new ArrayCollection();
+        $this->enrollments = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -229,6 +234,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getAiSuggestions(): Collection
     {
         return $this->aiSuggestions;
+    }
+
+    // ========== NOUVEAUX GETTERS POUR ENROLLMENT ==========
+    public function getEnrollments(): Collection
+    {
+        return $this->enrollments;
+    }
+
+    /**
+     * Récupère les cours auxquels l'étudiant est inscrit
+     */
+    public function getEnrolledCourses(): Collection
+    {
+        return $this->enrollments->map(fn($e) => $e->getCourse());
+    }
+
+    /**
+     * Vérifie si l'étudiant est inscrit à un cours
+     */
+    public function isEnrolledInCourse(Course $course): bool
+    {
+        return $this->enrollments->exists(
+            fn($key, $enrollment) => $enrollment->getCourse() === $course
+        );
     }
 
     // ========== MÉTHODES DE CALCUL ==========
